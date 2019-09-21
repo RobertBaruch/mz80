@@ -1,0 +1,17 @@
+[tasks]
+bmc
+
+[options]
+bmc: mode bmc
+bmc: depth 20
+multiclock off
+
+[engines]
+smtbmc boolector
+
+[script]
+read_ilang transparent_latch.il
+prep -top top
+
+[files]
+transparent_latch.il

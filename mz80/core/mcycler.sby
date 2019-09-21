@@ -1,0 +1,20 @@
+[tasks]
+bmc
+cover
+
+[options]
+bmc: mode bmc
+bmc: depth 20
+cover: mode cover
+cover: depth 20
+multiclock on
+
+[engines]
+smtbmc boolector
+
+[script]
+read_ilang mcycler.il
+prep -top top
+
+[files]
+mcycler.il

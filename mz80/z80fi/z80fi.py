@@ -327,8 +327,11 @@ class Z80fiCycles(Elaboratable):
             with m.If(mcycles.num < 6):
                 with m.Switch(mcycles.num):
                     with m.Case(0):
+                        # Because instruction state can only be finalized during
+                        # M1 T1 of the next instruction, we register M1 cycles
+                        # on M1 T2.
                         m.d.pos += mcycles.type1.eq(control.add_mcycle)
-                        m.d.pos += mcycles.tcycles1.eq(1)
+                        m.d.pos += mcycles.tcycles1.eq(2)
                     with m.Case(1):
                         m.d.pos += mcycles.type2.eq(control.add_mcycle)
                         m.d.pos += mcycles.tcycles2.eq(1)

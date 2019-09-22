@@ -93,7 +93,6 @@ class Sequencer(Elaboratable):
                     # going in to this instruction on the next cycle.
                     m.d.comb += self.z80fi.control.set_valid.eq(1)
                     m.d.comb += self.z80fi.control.save_registers_out.eq(1)
-                    m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.M1)
 
                 m.next = "M1_T2"
 
@@ -102,6 +101,7 @@ class Sequencer(Elaboratable):
                 m.d.comb += self.controls.readRegister16.eq(Register16.PC)
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.clear.eq(1)
+                    m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.M1)
 
                 with m.If(self.act):
                     m.d.comb += self.controls.addrIncDecSetting.eq(
@@ -118,7 +118,6 @@ class Sequencer(Elaboratable):
                             self.z80fi.control.instr.eq(self.instr.input),
                             self.z80fi.control.useIX.eq(self.controls.useIX),
                             self.z80fi.control.useIY.eq(self.controls.useIY),
-                            self.z80fi.control.add_tcycle.eq(1)
                         ]
 
                     m.next = "M1_T3"

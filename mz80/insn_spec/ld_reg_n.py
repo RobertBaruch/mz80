@@ -91,5 +91,35 @@ if __name__ == "__main__":
             Assert(spec.regs_out.PC == actual.regs_out.PC),
             Assert(spec.mcycles.num == actual.mcycles.num),
         ]
+        with m.If(spec.mcycles.num >= 1):
+            m.d.comb += [
+                Assert(spec.mcycles.tcycles1 == actual.mcycles.tcycles1),
+                Assert(spec.mcycles.type1 == actual.mcycles.type1),
+            ]
+        with m.If(spec.mcycles.num >= 2):
+            m.d.comb += [
+                Assert(spec.mcycles.tcycles2 == actual.mcycles.tcycles2),
+                Assert(spec.mcycles.type2 == actual.mcycles.type2),
+            ]
+        with m.If(spec.mcycles.num >= 3):
+            m.d.comb += [
+                Assert(spec.mcycles.tcycles3 == actual.mcycles.tcycles3),
+                Assert(spec.mcycles.type3 == actual.mcycles.type3),
+            ]
+        with m.If(spec.mcycles.num >= 4):
+            m.d.comb += [
+                Assert(spec.mcycles.tcycles4 == actual.mcycles.tcycles4),
+                Assert(spec.mcycles.type4 == actual.mcycles.type4),
+            ]
+        with m.If(spec.mcycles.num >= 5):
+            m.d.comb += [
+                Assert(spec.mcycles.tcycles5 == actual.mcycles.tcycles5),
+                Assert(spec.mcycles.type5 == actual.mcycles.type5),
+            ]
+        with m.If(spec.mcycles.num >= 6):
+            m.d.comb += [
+                Assert(spec.mcycles.tcycles6 == actual.mcycles.tcycles6),
+                Assert(spec.mcycles.type6 == actual.mcycles.type6),
+            ]
 
     main(m, ports=[clk, rst] + z80.ports())

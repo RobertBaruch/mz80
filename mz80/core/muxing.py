@@ -12,143 +12,154 @@ class SequencerControls(Record):
                  DIR_FANOUT),
                 ("dataBusDest", Signal.enum(DataBusDestination).shape(),
                  DIR_FANOUT),
-                ("register8Source", Signal.enum(Register8).shape(),
+                ("readRegister8", Signal.enum(Register8).shape(), DIR_FANOUT),
+                ("readRegister16", Signal.enum(Register16).shape(),
                  DIR_FANOUT),
-                ("register16Source", Signal.enum(Register16).shape(),
-                 DIR_FANOUT),
-                ("register8Dest", Signal.enum(Register8).shape(), DIR_FANOUT),
-                ("register16Dest", Signal.enum(Register16).shape(),
+                ("writeRegister8", Signal.enum(Register8).shape(), DIR_FANOUT),
+                # The source of 16-bit register writes is the IncDec output.
+                ("writeRegister16", Signal.enum(Register16).shape(),
                  DIR_FANOUT),
                 ("addrIncDecSetting", Signal.enum(IncDecSetting).shape(),
                  DIR_FANOUT),
+                ("useIX", 1, DIR_FANOUT),
+                ("useIY", 1, DIR_FANOUT),
+                # registerSet chooses whether we use the W set or the W2 set.
+                ("registerSet", 1, DIR_FANOUT),
+                ("aluFunc", Signal.enum(ALUFunc).shape(), DIR_FANOUT),
             ]))
 
 
 @unique
+class ALUFunc(Enum):
+    ADD = 1
+
+
+@unique
 class Register8(Enum):
-    I = 0
-    R = 1
-    W = 2
-    Z = 3
-    B = 4
-    C = 5
-    D = 6
-    E = 7
-    H = 8
-    L = 9
-    A = 10
-    F = 11
-    INVALID = 12
+    NONE = 0
+    I = 1
+    R = 2
+    W = 3
+    Z = 4
+    B = 5
+    C = 6
+    D = 7
+    E = 8
+    H = 9
+    L = 10
+    A = 11
+    F = 12
+    TMP = 13
 
     @classmethod
     def r(cls, value):
         return Array([
             Register8.B, Register8.C, Register8.D, Register8.E, Register8.H,
-            Register8.L, Register8.INVALID, Register8.A
+            Register8.L, Register8.NONE, Register8.A
         ])[value]
 
 
 @unique
 class Register16(Enum):
-    WZ = 0
-    BC = 1
-    DE = 2
-    HL = 3
-    SP = 4
-    PC = 5
-    ADDR_ALU = 6
-    INVALID = 7
+    NONE = 0
+    WZ = 1
+    BC = 2
+    DE = 3
+    HL = 4
+    SP = 5
+    PC = 6
+    ADDR_ALU = 7
 
 
 @unique
 class DataBusDestination(Enum):
-    I = 0
-    R = 1
-    W = 2
-    Z = 3
-    B = 4
-    C = 5
-    D = 6
-    E = 7
-    H = 8
-    L = 9
-    A = 10
-    F = 11
-    OFFSET = 12
-    TMP = 13
-    INSTR = 14
-    DATABUFF = 15
-    INVALID = 16
+    NONE = 0
+    I = 1
+    R = 2
+    W = 3
+    Z = 4
+    B = 5
+    C = 6
+    D = 7
+    E = 8
+    H = 9
+    L = 10
+    A = 11
+    F = 12
+    OFFSET = 13
+    TMP = 14
+    INSTR = 15
+    DATABUFF = 16
 
     @classmethod
     def r(cls, value):
         return Array([
             DataBusDestination.B, DataBusDestination.C, DataBusDestination.D,
             DataBusDestination.E, DataBusDestination.H, DataBusDestination.L,
-            DataBusDestination.INVALID, DataBusDestination.A
+            DataBusDestination.NONE, DataBusDestination.A
         ])[value]
 
 
 @unique
 class DataBusSource(Enum):
-    I = 0
-    R = 1
-    W = 2
-    Z = 3
-    B = 4
-    C = 5
-    D = 6
-    E = 7
-    H = 8
-    L = 9
-    A = 10
-    F = 11
-    ALU = 12
-    DATABUFF = 13
-    TMP = 14
-    INVALID = 15
+    NONE = 0
+    I = 1
+    R = 2
+    W = 3
+    Z = 4
+    B = 5
+    C = 6
+    D = 7
+    E = 8
+    H = 9
+    L = 10
+    A = 11
+    F = 12
+    ALU = 13
+    DATABUFF = 14
+    TMP = 15
 
     @classmethod
     def r(cls, value):
         return Array([
             DataBusSource.B, DataBusSource.C, DataBusSource.D, DataBusSource.E,
-            DataBusSource.H, DataBusSource.L, DataBusSource.INVALID,
+            DataBusSource.H, DataBusSource.L, DataBusSource.NONE,
             DataBusSource.A
         ])[value]
 
 
 @unique
 class AddrBusSource(Enum):
-    WZ = 0
-    BC = 1
-    DE = 2
-    HL = 3
-    SP = 4
-    PC = 5
-    ADDR_ALU = 6
-    INVALID = 7
+    NONE = 0
+    WZ = 1
+    BC = 2
+    DE = 3
+    HL = 4
+    SP = 5
+    PC = 6
+    ADDR_ALU = 7
 
 
 @unique
 class AddrIncDecDestination(Enum):
-    WZ = 0
-    BC = 1
-    DE = 2
-    HL = 3
-    SP = 4
-    PC = 5
-    INVALID = 6
+    NONE = 0
+    WZ = 1
+    BC = 2
+    DE = 3
+    HL = 4
+    SP = 5
+    PC = 6
 
 
 @unique
 class AddrALUSource(Enum):
-    WZ = 0
-    BC = 1
-    DE = 2
-    HL = 3
-    SP = 4
-    PC = 5
-    INVALID = 6
+    NONE = 0
+    WZ = 1
+    BC = 2
+    DE = 3
+    HL = 4
+    SP = 5
+    PC = 6
 
 
 @unique

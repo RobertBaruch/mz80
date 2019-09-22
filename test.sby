@@ -1,12 +1,12 @@
 [tasks]
 cover
-bmc
+# bmc
 
 [options]
 cover: mode cover
 cover: depth 60
-bmc: mode bmc
-bmc: depth 60
+# bmc: mode bmc
+# bmc: depth 60
 multiclock off
 
 [engines]

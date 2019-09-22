@@ -6,13 +6,14 @@ from enum import Enum, unique
 
 
 class Z80fiInterface(Record):
-    def __init__(self):
+    def __init__(self, name=None):
         super().__init__(
             Layout([
                 ("control", Z80fiControlsLayout(), DIR_FANOUT),
                 ("registers", RegRecordLayout(DIR_FANOUT), DIR_FANOUT),
                 ("state", StateLayout(), DIR_FANOUT),
-            ]))
+            ]),
+            name=name)
 
 
 class Z80fiControlsLayout(Layout):
@@ -141,7 +142,7 @@ class AccessType(Enum):
 class Z80fiInstrState(Elaboratable):
     def __init__(self):
         # The interface to set the signals
-        self.iface = Z80fiInterface()
+        self.iface = Z80fiInterface(name="iface")
         self.data = Z80fiState()
         self.instr_state = Z80fiState()
 

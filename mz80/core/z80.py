@@ -5,6 +5,7 @@ from nmigen.back import pysim
 
 from .sequencer import Sequencer
 from .arch import Registers
+from .alu import ALU
 from .incdec import IncDec
 from .mcycler import MCycler
 from .muxing import *
@@ -39,6 +40,7 @@ class Z80(Elaboratable):
     def elaborate(self, platform):
         addrBus = Signal(16)
         dataBus = Signal(8)
+        controls = SequencerControls()
 
         m = Module()
         m.submodules.sequencer = sequencer = Sequencer(
@@ -47,6 +49,7 @@ class Z80(Elaboratable):
             include_z80fi=self.include_z80fi)
         m.submodules.mcycler = mcycler = MCycler()
         m.submodules.incdec = incdec = IncDec(16)
+        m.submodules.alu = alu = ALU(include_z80fi=self.include_z80fi)
 
         m.d.comb += [
             mcycler.addr.eq(addrBus),
@@ -58,7 +61,6 @@ class Z80(Elaboratable):
 
         m.d.comb += [
             incdec.input.eq(addrBus),
-            incdec.setting.eq(sequencer.addrIncDecSetting),
         ]
 
         m.d.comb += [
@@ -66,17 +68,15 @@ class Z80(Elaboratable):
             sequencer.dataBusIn.eq(dataBus),
         ]
 
+        m.d.comb += sequencer.controls.connect(
+            registers.controls, incdec.controls, alu.controls, controls)
+
         m.d.comb += [
-            registers.useIX.eq(sequencer.useIX),
-            registers.useIY.eq(sequencer.useIY),
-            registers.registerSet.eq(sequencer.registerSet),
-            registers.readRegister8.eq(sequencer.register8Source),
-            registers.readRegister16.eq(sequencer.register16Source),
-            registers.writeRegister8.eq(sequencer.register8Dest),
-            registers.writeRegister16.eq(sequencer.register16Dest),
             registers.input16.eq(incdec.output),
             registers.input8.eq(dataBus),
         ]
+
+        m.d.comb += alu.input.eq(dataBus)
 
         m.d.comb += [
             self.A.eq(addrBus),
@@ -91,18 +91,22 @@ class Z80(Elaboratable):
         ]
 
         with m.If(
-                sequencer.register16Source.matches(
-                    Register16.WZ, Register16.BC, Register16.DE, Register16.HL,
-                    Register16.SP, Register16.PC)):
+                controls.readRegister16.matches(Register16.WZ, Register16.BC,
+                                                Register16.DE, Register16.HL,
+                                                Register16.SP, Register16.PC)):
             m.d.comb += addrBus.eq(registers.output16)
         with m.Else():
             m.d.comb += addrBus.eq(0xFFFF)
 
         with m.If(
-                sequencer.register8Source.matches(
+                controls.readRegister8.matches(
                     Register8.B, Register8.C, Register8.D, Register8.E,
                     Register8.H, Register8.L, Register8.W, Register8.Z)):
             m.d.comb += dataBus.eq(registers.output8)
+        with m.Elif(
+                controls.readRegister8.matches(Register8.A, Register8.F,
+                                               Register8.TMP)):
+            m.d.comb += dataBus.eq(alu.output)
         with m.Else():
             with m.If(mcycler.rd):
                 m.d.comb += dataBus.eq(self.Din)
@@ -110,8 +114,13 @@ class Z80(Elaboratable):
                 m.d.comb += dataBus.eq(0xFF)
 
         if self.include_z80fi:
-            m.d.comb += registers.z80fi.connect(self.z80fi.registers,
-                                                sequencer.z80fi.registers),
+            z80registers = Record(
+                RegRecordLayout(DIR_FANIN), name="z80_registers")
+            m.d.comb += z80registers.connect(registers.z80fi, alu.z80fi)
+            m.d.comb += sequencer.z80fi.registers.eq(z80registers)
+            m.d.comb += self.z80fi.registers.eq(z80registers)
+            # m.d.comb += registers.z80fi.connect(self.z80fi.registers,
+            #                                     sequencer.z80fi.registers),
             m.d.comb += sequencer.z80fi.control.connect(self.z80fi.control),
             m.d.comb += self.z80fi.state.connect(sequencer.z80fi.state),
             m.d.comb += self.z80fi.state.dataBus.eq(dataBus),

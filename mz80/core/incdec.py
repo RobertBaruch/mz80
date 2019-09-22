@@ -13,17 +13,14 @@ class IncDec(Elaboratable):
     """
 
     def __init__(self, width):
+        self.controls = SequencerControls()
         self.input = Signal(width)
         self.output = Signal(width)
-        self.setting = Signal.enum(IncDecSetting)
-
-    def ports(self):
-        return [self.input, self.output, self.setting]
 
     def elaborate(self, platform):
         m = Module()
 
-        with m.Switch(self.setting):
+        with m.Switch(self.controls.addrIncDecSetting):
             with m.Case(IncDecSetting.INC):
                 m.d.comb += self.output.eq(self.input + 1)
             with m.Case(IncDecSetting.DEC):

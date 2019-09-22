@@ -72,6 +72,8 @@ class Sequencer(Elaboratable):
                 m.d.comb += self.z80fi.control.add_memwr_access.eq(0)
                 m.d.comb += self.z80fi.control.add_iord_access.eq(0)
                 m.d.comb += self.z80fi.control.add_iowr_access.eq(0)
+                m.d.comb += self.z80fi.control.add_tcycle.eq(0)
+                m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.NONE)
                 m.d.comb += self.z80fi.control.save_registers_in.eq(0)
                 m.d.comb += self.z80fi.control.save_registers_out.eq(0)
                 m.d.comb += self.z80fi.control.save_instruction.eq(0)
@@ -91,6 +93,7 @@ class Sequencer(Elaboratable):
                     # going in to this instruction on the next cycle.
                     m.d.comb += self.z80fi.control.set_valid.eq(1)
                     m.d.comb += self.z80fi.control.save_registers_out.eq(1)
+                    m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.M1)
 
                 m.next = "M1_T2"
 
@@ -115,29 +118,40 @@ class Sequencer(Elaboratable):
                             self.z80fi.control.instr.eq(self.instr.input),
                             self.z80fi.control.useIX.eq(self.controls.useIX),
                             self.z80fi.control.useIY.eq(self.controls.useIY),
+                            self.z80fi.control.add_tcycle.eq(1)
                         ]
 
                     m.next = "M1_T3"
 
             with m.State("M1_T3"):
                 m.d.comb += self.controls.readRegister16.eq(Register16.NONE)
+                if self.include_z80fi:
+                    m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                 m.next = "M1_T4"
 
             with m.State("M1_T4"):
                 m.d.comb += self.controls.readRegister16.eq(Register16.NONE)
+                if self.include_z80fi:
+                    m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                 self.execute(m)
 
             with m.State("EXTENDED"):
+                if self.include_z80fi:
+                    m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                 self.execute(m)
 
             with m.State("RDOPERAND_T1"):
                 m.d.comb += self.controls.readRegister16.eq(Register16.PC)
+                if self.include_z80fi:
+                    m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.MEMRD)
                 m.next = "RDOPERAND_T2"
 
             # This state can be waitstated. If waitstated, self.act will be 0.
             with m.State("RDOPERAND_T2"):
                 m.d.comb += self.controls.readRegister16.eq(Register16.PC)
                 with m.If(self.act):
+                    if self.include_z80fi:
+                        m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                     m.next = "RDOPERAND_T3"
 
             with m.State("RDOPERAND_T3"):
@@ -149,14 +163,15 @@ class Sequencer(Elaboratable):
 
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.add_operand.eq(1)
-                    m.d.comb += self.z80fi.control.data.eq(
-                        self.z80fi.state.dataBus)
-                    m.d.comb += self.z80fi.control.addr.eq(
-                        self.z80fi.state.addrBus)
+                    m.d.comb += self.z80fi.control.data.eq(self.z80fi.bus.data)
+                    m.d.comb += self.z80fi.control.addr.eq(self.z80fi.bus.addr)
+                    m.d.comb += self.z80fi.control.add_tcycle.eq(1)
 
             with m.State("RDMEM_T1"):
                 m.d.comb += self.controls.readRegister16.eq(
                     self.readAddrSrcReg)
+                if self.include_z80fi:
+                    m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.MEMRD)
                 m.next = "RDMEM_T2"
 
             # This state can be waitstated. If waitstated, self.act will be 0.
@@ -164,6 +179,8 @@ class Sequencer(Elaboratable):
                 m.d.comb += self.controls.readRegister16.eq(
                     self.readAddrSrcReg)
                 with m.If(self.act):
+                    if self.include_z80fi:
+                        m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                     m.next = "RDMEM_T3"
 
             with m.State("RDMEM_T3"):
@@ -173,14 +190,15 @@ class Sequencer(Elaboratable):
 
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.add_memrd_access.eq(1)
-                    m.d.comb += self.z80fi.control.data.eq(
-                        self.z80fi.state.dataBus)
-                    m.d.comb += self.z80fi.control.addr.eq(
-                        self.z80fi.state.addrBus)
+                    m.d.comb += self.z80fi.control.data.eq(self.z80fi.bus.data)
+                    m.d.comb += self.z80fi.control.addr.eq(self.z80fi.bus.addr)
+                    m.d.comb += self.z80fi.control.add_tcycle.eq(1)
 
             with m.State("WRMEM_T1"):
                 m.d.comb += self.controls.readRegister16.eq(
                     self.writeAddrSrcReg)
+                if self.include_z80fi:
+                    m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.MEMWR)
                 # activate TMP to data bus
                 m.next = "WRMEM_T2"
 
@@ -190,6 +208,8 @@ class Sequencer(Elaboratable):
                     self.writeAddrSrcReg)
                 # activate TMP to data bus
                 with m.If(self.act):
+                    if self.include_z80fi:
+                        m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                     m.next = "WRMEM_T3"
 
             with m.State("WRMEM_T3"):
@@ -200,10 +220,9 @@ class Sequencer(Elaboratable):
 
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.add_memwr_access.eq(1)
-                    m.d.comb += self.z80fi.control.data.eq(
-                        self.z80fi.state.dataBus)
-                    m.d.comb += self.z80fi.control.addr.eq(
-                        self.z80fi.state.addrBus)
+                    m.d.comb += self.z80fi.control.data.eq(self.z80fi.bus.data)
+                    m.d.comb += self.z80fi.control.addr.eq(self.z80fi.bus.addr)
+                    m.d.comb += self.z80fi.control.add_tcycle.eq(1)
 
             with m.State("HALT"):
                 m.next = "HALT"

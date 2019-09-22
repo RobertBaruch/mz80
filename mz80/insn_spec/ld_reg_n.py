@@ -2,6 +2,7 @@ from nmigen import *
 from nmigen.cli import main
 from nmigen.asserts import *
 from ..core.z80 import Z80
+from ..core.muxing import MCycle
 from ..z80fi.z80fi import Z80fiState, Z80fiInstrState
 
 
@@ -19,8 +20,16 @@ class ld_reg_n(Elaboratable):
         m.d.comb += self.spec.valid.eq(self.actual.valid & (
             self.actual.instr.matches("00---110")) & (r != 6))
 
-        m.d.comb += self.spec.regs_out.eq(self.actual.regs_out)
-        m.d.comb += self.spec.regs_out_r(r).eq(n)
+        m.d.comb += [
+            self.spec.regs_out.eq(self.actual.regs_out),
+            self.spec.regs_out_r(r).eq(n),
+            self.spec.regs_out.PC.eq(self.actual.regs_in.PC + 2),
+            self.spec.mcycles.num.eq(2),
+            self.spec.mcycles.type1.eq(MCycle.M1),
+            self.spec.mcycles.tcycles1.eq(4),
+            self.spec.mcycles.type2.eq(MCycle.MEMRD),
+            self.spec.mcycles.tcycles2.eq(3),
+        ]
         return m
 
 
@@ -80,6 +89,7 @@ if __name__ == "__main__":
             Assert(spec.regs_out.IY == actual.regs_out.IY),
             Assert(spec.regs_out.SP == actual.regs_out.SP),
             Assert(spec.regs_out.PC == actual.regs_out.PC),
+            Assert(spec.mcycles.num == actual.mcycles.num),
         ]
 
     main(m, ports=[clk, rst] + z80.ports())

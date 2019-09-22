@@ -122,9 +122,9 @@ class Z80(Elaboratable):
             # m.d.comb += registers.z80fi.connect(self.z80fi.registers,
             #                                     sequencer.z80fi.registers),
             m.d.comb += sequencer.z80fi.control.connect(self.z80fi.control),
-            m.d.comb += self.z80fi.state.connect(sequencer.z80fi.state),
-            m.d.comb += self.z80fi.state.dataBus.eq(dataBus),
-            m.d.comb += self.z80fi.state.addrBus.eq(addrBus),
+            m.d.comb += self.z80fi.bus.connect(sequencer.z80fi.bus),
+            m.d.comb += self.z80fi.bus.data.eq(dataBus),
+            m.d.comb += self.z80fi.bus.addr.eq(addrBus),
 
         return m
 

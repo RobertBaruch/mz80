@@ -35,6 +35,18 @@ class ALUFunc(Enum):
 
 
 @unique
+class MCycle(Enum):
+    NONE = 0
+    M1 = 1
+    MEMRD = 2
+    MEMWR = 3
+    IORD = 4
+    IOWR = 5
+    INTERNAL = 6
+    BUSRELEASE = 7
+
+
+@unique
 class Register8(Enum):
     NONE = 0
     I = 1

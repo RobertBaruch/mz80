@@ -4,18 +4,7 @@ from nmigen.cli import main
 from nmigen.asserts import *
 
 from .edgelord import Edgelord
-
-@unique
-class MCycle(Enum):
-    NONE = 0
-    M1 = 1
-    MEMRD = 2
-    MEMWR = 3
-    IORD = 4
-    IOWR = 5
-    INTERNAL = 6
-    BUSRELEASE = 7
-
+from .muxing import MCycle
 
 class MCycler(Elaboratable):
     def __init__(self):

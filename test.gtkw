@@ -1,0 +1,42 @@
+[*]
+[*] GTKWave Analyzer v3.3.100 (w)1999-2019 BSI
+[*] Mon Sep 23 00:32:14 2019
+[*]
+[dumpfile] "F:\mz80\test_bmc\engine_0\trace.vcd"
+[dumpfile_mtime] "Mon Sep 23 00:23:15 2019"
+[dumpfile_size] 1214144
+[savefile] "F:\mz80\test.gtkw"
+[timestart] 6
+[size] 1513 600
+[pos] -1 -1
+*-5.779567 250 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] top.
+[treeopen] top.state.
+[treeopen] top.z80.
+[sst_width] 266
+[signals_width] 254
+[sst_expanded] 1
+[sst_vpaned_height] 154
+@28
+top.z80.sequencer.clk
+top.test.spec__valid
+@22
+top.test.actual__instr[7:0]
+top.test.actual__operands__data0[7:0]
+@28
+top.state.mcycles.control__clear
+top.state.mcycles.mcycles__num[2:0]
+top.state.mcycles.control__add_mcycle[2:0]
+top.z80.sequencer.useIX
+top.z80.sequencer.useIY
+@22
+top.z80.registers.input8[7:0]
+top.state.regs_out.registers__IY[15:0]
+top.z80.registers.IXh[7:0]
+top.z80.registers.IXl[7:0]
+top.state.regs_out.regs_out__IX[15:0]
+top.test.spec__regs_out__IX[15:0]
+@23
+top.test.spec__regs_out__L1[7:0]
+[pattern_trace] 1
+[pattern_trace] 0

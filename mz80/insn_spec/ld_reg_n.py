@@ -3,7 +3,7 @@ from nmigen.cli import main
 from nmigen.asserts import *
 from ..core.z80 import Z80
 from ..core.muxing import MCycle
-from ..z80fi.z80fi import Z80fiState, Z80fiInstrState
+from ..z80fi.z80fi import *
 
 
 class ld_reg_n(Elaboratable):
@@ -21,8 +21,10 @@ class ld_reg_n(Elaboratable):
             self.actual.instr.matches("00---110")) & (r != 6))
 
         m.d.comb += [
+            self.spec.useIX.eq(self.actual.useIX),
+            self.spec.useIY.eq(self.actual.useIY),
             self.spec.regs_out.eq(self.actual.regs_out),
-            self.spec.regs_out_r(r).eq(n),
+            regs_out_r(self.spec, r).eq(n),
             self.spec.regs_out.PC.eq(self.actual.regs_in.PC + 2),
             self.spec.mcycles.num.eq(2),
             self.spec.mcycles.type1.eq(MCycle.M1),
@@ -55,9 +57,9 @@ if __name__ == "__main__":
 
     actual = Z80fiState()
     spec = Z80fiState()
-    count = Signal.range(0, 60)
+    count = Signal.range(0, 61)
 
-    with m.If(count < 59):
+    with m.If(count < 60):
         m.d.pos += count.eq(count + 1)
 
     m.d.comb += z80.z80fi.connect(state.iface)

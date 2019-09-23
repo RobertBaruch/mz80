@@ -136,17 +136,17 @@ class Registers(Elaboratable):
                         self.input8)
                 with m.Case(Register8.H):
                     with m.If(self.controls.useIX):
-                        m.d.comb += self.output8.eq(self.IXh)
+                        m.d.pos += self.IXh.eq(self.input8)
                     with m.Elif(self.controls.useIY):
-                        m.d.comb += self.output8.eq(self.IYh)
+                        m.d.pos += self.IYh.eq(self.input8)
                     with m.Else():
                         m.d.pos += self.H[self.controls.registerSet].eq(
                             self.input8)
                 with m.Case(Register8.L):
                     with m.If(self.controls.useIX):
-                        m.d.comb += self.output8.eq(self.IXl)
+                        m.d.pos += self.IXl.eq(self.input8)
                     with m.Elif(self.controls.useIY):
-                        m.d.comb += self.output8.eq(self.IYl)
+                        m.d.pos += self.IYl.eq(self.input8)
                     with m.Else():
                         m.d.pos += self.L[self.controls.registerSet].eq(
                             self.input8)

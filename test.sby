@@ -1,13 +1,13 @@
 [tasks]
-cover
-# bmc
+# cover
+bmc
 
 [options]
-cover: mode cover
-cover: depth 60
-# bmc: mode bmc
-# bmc: depth 60
-multiclock off
+# cover: mode cover
+# cover: depth 61
+bmc: mode bmc
+bmc: depth 35
+multiclock on
 
 [engines]
 smtbmc boolector

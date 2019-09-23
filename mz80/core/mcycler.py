@@ -130,7 +130,7 @@ class MCycler(Elaboratable):
                 self.wr.eq(0),
                 self.rfsh.eq(0),
                 self.busack.eq(0),
-                self.act.eq(~self.waitstated),
+                self.act.eq(~self.waitstated & ~self.hiz),
                 self.rdata.eq(0),
             ]
 

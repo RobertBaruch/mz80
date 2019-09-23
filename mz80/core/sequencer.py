@@ -78,6 +78,7 @@ class Sequencer(Elaboratable):
                 m.d.comb += self.z80fi.control.save_registers_out.eq(0)
                 m.d.comb += self.z80fi.control.save_instruction.eq(0)
                 m.d.comb += self.z80fi.control.set_valid.eq(0)
+                m.d.comb += self.z80fi.control.clear.eq(0)
 
             with m.State("RESET"):
                 m.d.pos += self.controls.registerSet.eq(0)
@@ -289,11 +290,13 @@ class Sequencer(Elaboratable):
             with m.Case(0xDD):
                 m.d.pos += self.controls.useIX.eq(1)
                 m.d.pos += self.controls.useIY.eq(0)
+                m.d.pos += self.cycle_num.eq(0)
                 self.initiateOpcodeFetch(m)
 
             with m.Case(0xFD):
                 m.d.pos += self.controls.useIX.eq(0)
                 m.d.pos += self.controls.useIY.eq(1)
+                m.d.pos += self.cycle_num.eq(0)
                 self.initiateOpcodeFetch(m)
 
             with m.Case("00000000"):

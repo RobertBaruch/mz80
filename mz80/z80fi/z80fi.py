@@ -28,7 +28,7 @@ class Z80fiControlsLayout(Layout):
             ("add_iord_access", 1, DIR_FANOUT),
             ("add_iowr_access", 1, DIR_FANOUT),
             ("add_tcycle", 1, DIR_FANOUT),
-            ("add_mcycle", Signal.enum(MCycle).shape(), DIR_FANOUT),
+            ("add_mcycle", MCycle, DIR_FANOUT),
             ("save_registers_in", 1, DIR_FANOUT),
             ("save_registers_out", 1, DIR_FANOUT),
             ("save_instruction", 1, DIR_FANOUT),
@@ -94,17 +94,58 @@ class Z80fiState(Record):
                     ("mcycles", CycleLayout(), DIR_FANIN)]),
             name=name)
 
-    def regs_in_r(self, r):
-        return self._reg_r(r, self.regs_in)
 
-    def regs_out_r(self, r):
-        return self._reg_r(r, self.regs_out)
+def regs_in_r(spec: Z80fiState, r):
+    return _reg_r(spec, r, spec.regs_in)
 
-    def _reg_r(self, r, regs):
-        return Array([
-            regs.B1, regs.C1, regs.D1, regs.E1, regs.H1, regs.L1,
-            Signal(8), regs.A1
-        ])[r]
+
+def regs_out_r(spec: Z80fiState, r):
+    return _reg_r(spec, r, spec.regs_out)
+
+
+def _reg_r(spec: Z80fiState, r, regs):
+    # s = 0: HL
+    # s = 1: IX
+    # s = 2: IY
+    # s = 3: illegal (just use HL)
+    s = Cat(r, spec.useIX, spec.useIY)
+    return Array([
+        regs.B1,
+        regs.C1,
+        regs.D1,
+        regs.E1,
+        regs.H1,
+        regs.L1,
+        Signal(8),
+        regs.A1,
+        # useIX = 1
+        regs.B1,
+        regs.C1,
+        regs.D1,
+        regs.E1,
+        regs.IX[8:],
+        regs.IX[:8],
+        Signal(8),
+        regs.A1,
+        # useIY = 1
+        regs.B1,
+        regs.C1,
+        regs.D1,
+        regs.E1,
+        regs.IY[8:],
+        regs.IY[:8],
+        Signal(8),
+        regs.A1,
+        # useIX = 1, useIY = 1
+        regs.B1,
+        regs.C1,
+        regs.D1,
+        regs.E1,
+        regs.H1,
+        regs.L1,
+        Signal(8),
+        regs.A1,
+    ])[s]
 
 
 class Z80fiInstrState(Elaboratable):
@@ -280,17 +321,17 @@ class CycleLayout(Layout):
     def __init__(self):
         super().__init__([
             ("num", 3, DIR_FANIN),
-            ("type1", Signal.enum(MCycle).shape(), DIR_FANIN),
+            ("type1", MCycle, DIR_FANIN),
             ("tcycles1", 3, DIR_FANIN),
-            ("type2", Signal.enum(MCycle).shape(), DIR_FANIN),
+            ("type2", MCycle, DIR_FANIN),
             ("tcycles2", 3, DIR_FANIN),
-            ("type3", Signal.enum(MCycle).shape(), DIR_FANIN),
+            ("type3", MCycle, DIR_FANIN),
             ("tcycles3", 3, DIR_FANIN),
-            ("type4", Signal.enum(MCycle).shape(), DIR_FANIN),
+            ("type4", MCycle, DIR_FANIN),
             ("tcycles4", 3, DIR_FANIN),
-            ("type5", Signal.enum(MCycle).shape(), DIR_FANIN),
+            ("type5", MCycle, DIR_FANIN),
             ("tcycles5", 3, DIR_FANIN),
-            ("type6", Signal.enum(MCycle).shape(), DIR_FANIN),
+            ("type6", MCycle, DIR_FANIN),
             ("tcycles6", 3, DIR_FANIN),
         ])
 
@@ -324,7 +365,15 @@ class Z80fiCycles(Elaboratable):
                     m.d.pos += mcycles.tcycles6.eq(mcycles.tcycles6 + 1)
 
         with m.If(control.add_mcycle != MCycle.NONE):
-            with m.If(mcycles.num < 6):
+            with m.If(control.clear):
+                # Because instruction state can only be finalized during
+                # M1 T1 of the next instruction, we register M1 cycles
+                # on M1 T2.
+                m.d.pos += mcycles.type1.eq(control.add_mcycle)
+                m.d.pos += mcycles.tcycles1.eq(2)
+                m.d.pos += mcycles.num.eq(1)
+
+            with m.Elif(mcycles.num < 6):
                 with m.Switch(mcycles.num):
                     with m.Case(0):
                         # Because instruction state can only be finalized during

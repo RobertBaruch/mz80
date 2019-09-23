@@ -8,29 +8,25 @@ class SequencerControls(Record):
     def __init__(self):
         super().__init__(
             Layout([
-                ("dataBusSource", Signal.enum(DataBusSource).shape(),
-                 DIR_FANOUT),
-                ("dataBusDest", Signal.enum(DataBusDestination).shape(),
-                 DIR_FANOUT),
-                ("readRegister8", Signal.enum(Register8).shape(), DIR_FANOUT),
-                ("readRegister16", Signal.enum(Register16).shape(),
-                 DIR_FANOUT),
-                ("writeRegister8", Signal.enum(Register8).shape(), DIR_FANOUT),
+                ("dataBusSource", DataBusSource, DIR_FANOUT),
+                ("dataBusDest", DataBusDestination, DIR_FANOUT),
+                ("readRegister8", Register8, DIR_FANOUT),
+                ("readRegister16", Register16, DIR_FANOUT),
+                ("writeRegister8", Register8, DIR_FANOUT),
                 # The source of 16-bit register writes is the IncDec output.
-                ("writeRegister16", Signal.enum(Register16).shape(),
-                 DIR_FANOUT),
-                ("addrIncDecSetting", Signal.enum(IncDecSetting).shape(),
-                 DIR_FANOUT),
+                ("writeRegister16", Register16, DIR_FANOUT),
+                ("addrIncDecSetting", IncDecSetting, DIR_FANOUT),
                 ("useIX", 1, DIR_FANOUT),
                 ("useIY", 1, DIR_FANOUT),
                 # registerSet chooses whether we use the W set or the W2 set.
                 ("registerSet", 1, DIR_FANOUT),
-                ("aluFunc", Signal.enum(ALUFunc).shape(), DIR_FANOUT),
+                ("aluFunc", ALUFunc, DIR_FANOUT),
             ]))
 
 
 @unique
 class ALUFunc(Enum):
+    NONE = 0
     ADD = 1
 
 

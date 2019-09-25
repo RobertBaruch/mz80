@@ -8,7 +8,7 @@ from .muxing import MCycle
 
 class MCycler(Elaboratable):
     def __init__(self):
-        self.LATCHING = 0
+        self.LATCHING = Const(0)
 
         #
         # Signals eventually going outside

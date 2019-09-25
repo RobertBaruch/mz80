@@ -19,8 +19,12 @@ class Sequencer(Elaboratable):
         self.controls = SequencerControls()
 
         self.instr = TransparentLatch(8)
-        self.readAddrSrcReg = Signal.enum(Register16)
-        self.writeAddrSrcReg = Signal.enum(Register16)
+
+        # Where the data from a memory read should be stored.
+        self.memrd_addr = Signal.enum(Register16)
+        self.memrd_dest = Signal.enum(Register8)
+        self.memwr_addr = Signal.enum(Register16)
+        self.memwr_src = Signal.enum(Register8)
 
         #
         # Signals going to the mcycler
@@ -65,6 +69,7 @@ class Sequencer(Elaboratable):
             m.d.comb += self.controls.writeRegister16.eq(Register16.NONE)
             m.d.comb += self.controls.writeRegister8.eq(Register8.NONE)
             m.d.comb += self.controls.addrIncDecSetting.eq(IncDecSetting.ZERO)
+            m.d.comb += self.controls.addrALUInputByte.eq(0)
 
             if self.include_z80fi:
                 m.d.comb += self.z80fi.control.add_operand.eq(0)
@@ -159,6 +164,7 @@ class Sequencer(Elaboratable):
                 m.d.comb += self.controls.addrIncDecSetting.eq(
                     IncDecSetting.INC)
                 m.d.comb += self.controls.writeRegister16.eq(Register16.PC)
+                m.d.comb += self.controls.writeRegister8.eq(self.memrd_dest)
                 self.execute(m)
 
                 if self.include_z80fi:
@@ -168,24 +174,22 @@ class Sequencer(Elaboratable):
                     m.d.comb += self.z80fi.control.add_tcycle.eq(1)
 
             with m.State("RDMEM_T1"):
-                m.d.comb += self.controls.readRegister16.eq(
-                    self.readAddrSrcReg)
+                m.d.comb += self.controls.readRegister16.eq(self.memrd_addr)
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.MEMRD)
                 m.next = "RDMEM_T2"
 
             # This state can be waitstated. If waitstated, self.act will be 0.
             with m.State("RDMEM_T2"):
-                m.d.comb += self.controls.readRegister16.eq(
-                    self.readAddrSrcReg)
+                m.d.comb += self.controls.readRegister16.eq(self.memrd_addr)
                 with m.If(self.act):
                     if self.include_z80fi:
                         m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                     m.next = "RDMEM_T3"
 
             with m.State("RDMEM_T3"):
-                m.d.comb += self.controls.readRegister16.eq(
-                    self.readAddrSrcReg)
+                m.d.comb += self.controls.readRegister16.eq(self.memrd_addr)
+                m.d.comb += self.controls.writeRegister8.eq(self.memrd_dest)
                 self.execute(m)
 
                 if self.include_z80fi:
@@ -195,27 +199,24 @@ class Sequencer(Elaboratable):
                     m.d.comb += self.z80fi.control.add_tcycle.eq(1)
 
             with m.State("WRMEM_T1"):
-                m.d.comb += self.controls.readRegister16.eq(
-                    self.writeAddrSrcReg)
+                m.d.comb += self.controls.readRegister16.eq(self.memwr_addr)
+                m.d.comb += self.controls.readRegister8.eq(self.memwr_src)
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.MEMWR)
-                # activate TMP to data bus
                 m.next = "WRMEM_T2"
 
             # This state can be waitstated. If waitstated, self.act will be 0.
             with m.State("WRMEM_T2"):
-                m.d.comb += self.controls.readRegister16.eq(
-                    self.writeAddrSrcReg)
-                # activate TMP to data bus
+                m.d.comb += self.controls.readRegister16.eq(self.memwr_addr)
+                m.d.comb += self.controls.readRegister8.eq(self.memwr_src)
                 with m.If(self.act):
                     if self.include_z80fi:
                         m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                     m.next = "WRMEM_T3"
 
             with m.State("WRMEM_T3"):
-                m.d.comb += self.controls.readRegister16.eq(
-                    self.writeAddrSrcReg)
-                # activate TMP to data bus
+                m.d.comb += self.controls.readRegister16.eq(self.memwr_addr)
+                m.d.comb += self.controls.readRegister8.eq(self.memwr_src)
                 self.execute(m)
 
                 if self.include_z80fi:
@@ -266,7 +267,20 @@ class Sequencer(Elaboratable):
         m.d.comb += self.cycle.eq(MCycle.MEMRD)
         m.d.pos += self.instr.en.eq(0)
 
-    def initiateMemReadRegAddr(self, m, reg):
+    def initiateOperandReadInto(self, m, reg):
+        """Initiates a memory read of an instruction operand into reg.
+
+        * Registers (PC) -> addr bus (MCycler always gets this)
+        * Disable INSTR.
+        * Data goes into reg when done.
+        * PC is automatically incremented by state machine
+        """
+        m.next = "RDOPERAND_T1"
+        m.d.comb += self.cycle.eq(MCycle.MEMRD)
+        m.d.pos += self.instr.en.eq(0)
+        m.d.pos += self.memrd_dest.eq(reg)
+
+    def initiateMemRead(self, m, reg_addr, reg_data):
         """Initiates a memory read using a 16-bit register as address.
 
         * Registers (reg) -> addr bus (MCycler always gets this)
@@ -275,14 +289,31 @@ class Sequencer(Elaboratable):
         """
         m.next = "RDMEM_T1"
         m.d.comb += self.cycle.eq(MCycle.MEMRD)
-        m.d.pos += self.readAddrSrcReg.eq(reg)
+        m.d.pos += self.memrd_addr.eq(reg_addr)
+        m.d.pos += self.memrd_dest.eq(reg_data)
         m.d.pos += self.instr.en.eq(0)
 
-    def initiateMemWrite(self, m, reg, data):
+    def initiateMemWrite(self, m, reg_addr, reg_data):
         m.next = "WRMEM_T1"
         m.d.comb += self.cycle.eq(MCycle.MEMWR)
-        m.d.pos += self.writeAddrSrcReg.eq(reg)
         m.d.pos += self.instr.en.eq(0)
+        m.d.pos += self.memwr_addr.eq(reg_addr)
+        m.d.pos += self.memwr_src.eq(reg_data)
+
+    def aluAddrAddLow(self, m, reg16operand, reg_dest):
+        self.extendCycle(m)
+        m.d.comb += self.controls.addrALUInput.eq(reg16operand)
+        m.d.comb += self.controls.addrALUInputByte.eq(0)
+        m.d.pos += self.memrd_dest.eq(reg_dest)
+
+    def aluAddrAddHigh(self, m, reg16operand, reg_dest):
+        self.extendCycle(m)
+        m.d.comb += self.controls.addrALUInput.eq(reg16operand)
+        m.d.comb += self.controls.addrALUInputByte.eq(1)
+        m.d.pos += self.memrd_dest.eq(reg_dest)
+
+    def extendCycle(self, m):
+        m.d.comb += self.extend.eq(1)
 
     def execute(self, m):
         m.d.pos += self.cycle_num.eq(self.cycle_num + 1)
@@ -325,7 +356,7 @@ class Sequencer(Elaboratable):
                 m.d.comb += self.controls.writeRegister8.eq(Register8.r(dst_r))
                 self.initiateInstructionFetch(m)
             with m.Elif(src_hl):
-                self.initiateMemReadRegAddr(m, Register16.HL)
+                self.initiateMemRead(m, Register16.HL, Register8.r(dst_r))
             with m.Else():
                 self.initiateMemWrite(m, Register16.HL, Register8.r(src_r))
         with m.If(self.cycle_num == 1):
@@ -338,17 +369,36 @@ class Sequencer(Elaboratable):
     def LD_REG_N(self, m):
         r = self.instr.output[3:6]
 
-        with m.If(self.cycle_num == 0):
-            self.initiateOperandRead(m)
-        with m.Elif(self.cycle_num == 1):
-            with m.If(r != 6):
-                m.d.comb += self.controls.writeRegister8.eq(Register8.r(r))
-                self.initiateInstructionFetch(m)
+        with m.If(r != 6):
+            with m.If(self.cycle_num == 0):
+                self.initiateOperandReadInto(m, Register8.r(r))
             with m.Else():
-                # activate loading TMP
-                self.initiateMemWrite(m, AddrBusSource.HL, DataBusSource.TMP)
-        with m.Elif(self.cycle_num == 2):
-            self.initiateInstructionFetch(m)
+                self.initiateInstructionFetch(m)
+
+        with m.Elif(~self.controls.useIX & ~self.controls.useIY):
+            with m.If(self.cycle_num == 0):
+                self.initiateOperandReadInto(m, Register8.TMP)
+            with m.Elif(self.cycle_num == 1):
+                self.initiateMemWrite(m, Register16.HL, Register8.TMP)
+            with m.Else():
+                self.initiateInstructionFetch(m)
+
+        with m.Else():
+            with m.If(self.cycle_num == 0):
+                self.initiateOperandReadInto(m, Register8.OFFSET)
+            with m.Elif(self.cycle_num == 1):
+                self.initiateOperandReadInto(m, Register8.TMP)
+                self.extendCycle(m)
+            with m.Elif(self.cycle_num == 2):
+                self.aluAddrAddLow(m, Register16.HL, Register8.W)
+                self.extendCycle(m)
+            with m.Elif(self.cycle_num == 3):
+                self.aluAddrAddHigh(m, Register16.HL, Register8.Z)
+                self.extendCycle(m)
+            with m.Elif(self.cycle_num == 4):
+                self.initiateMemWrite(m, Register16.WZ, Register8.TMP)
+            with m.Else():
+                self.initiateInstructionFetch(m)
 
 
 if __name__ == "__main__":

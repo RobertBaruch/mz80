@@ -9,6 +9,7 @@ from .alu import ALU
 from .incdec import IncDec
 from .mcycler import MCycler
 from .muxing import *
+from .addralu import AddrALU
 from ..z80fi.z80fi import *
 
 
@@ -50,6 +51,7 @@ class Z80(Elaboratable):
         m.submodules.mcycler = mcycler = MCycler()
         m.submodules.incdec = incdec = IncDec(16)
         m.submodules.alu = alu = ALU(include_z80fi=self.include_z80fi)
+        m.submodules.addrALU = addrALU = AddrALU()
 
         m.d.comb += [
             mcycler.addr.eq(addrBus),
@@ -68,8 +70,9 @@ class Z80(Elaboratable):
             sequencer.dataBusIn.eq(dataBus),
         ]
 
-        m.d.comb += sequencer.controls.connect(
-            registers.controls, incdec.controls, alu.controls, controls)
+        m.d.comb += sequencer.controls.connect(registers.controls,
+                                               incdec.controls, alu.controls,
+                                               addrALU.controls, controls)
 
         m.d.comb += [
             registers.input16.eq(incdec.output),
@@ -77,6 +80,8 @@ class Z80(Elaboratable):
         ]
 
         m.d.comb += alu.input.eq(dataBus)
+        m.d.comb += addrALU.input.eq(registers.addrALUInput)
+        m.d.comb += addrALU.dataBus.eq(dataBus)
 
         m.d.comb += [
             self.A.eq(addrBus),
@@ -107,6 +112,8 @@ class Z80(Elaboratable):
                 controls.readRegister8.matches(Register8.A, Register8.F,
                                                Register8.TMP)):
             m.d.comb += dataBus.eq(alu.output)
+        with m.Elif(controls.readRegister8.matches(Register8.ADDR_ALU)):
+            m.d.comb += dataBus.eq(addrALU.output)
         with m.Else():
             with m.If(mcycler.rd):
                 m.d.comb += dataBus.eq(self.Din)

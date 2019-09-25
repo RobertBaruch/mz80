@@ -104,48 +104,19 @@ def regs_out_r(spec: Z80fiState, r):
 
 
 def _reg_r(spec: Z80fiState, r, regs):
-    # s = 0: HL
-    # s = 1: IX
-    # s = 2: IY
-    # s = 3: illegal (just use HL)
-    s = Cat(r, spec.useIX, spec.useIY)
+    ss = Cat(spec.useIX, spec.useIY)
+    h = Array([regs.H1, regs.IX[8:], regs.IY[8:], regs.H1])[ss]
+    l = Array([regs.L1, regs.IX[:8], regs.IY[:8], regs.L1])[ss]
     return Array([
         regs.B1,
         regs.C1,
         regs.D1,
         regs.E1,
-        regs.H1,
-        regs.L1,
+        h,
+        l,
         Signal(8),
         regs.A1,
-        # useIX = 1
-        regs.B1,
-        regs.C1,
-        regs.D1,
-        regs.E1,
-        regs.IX[8:],
-        regs.IX[:8],
-        Signal(8),
-        regs.A1,
-        # useIY = 1
-        regs.B1,
-        regs.C1,
-        regs.D1,
-        regs.E1,
-        regs.IY[8:],
-        regs.IY[:8],
-        Signal(8),
-        regs.A1,
-        # useIX = 1, useIY = 1
-        regs.B1,
-        regs.C1,
-        regs.D1,
-        regs.E1,
-        regs.H1,
-        regs.L1,
-        Signal(8),
-        regs.A1,
-    ])[s]
+    ])[r]
 
 
 class Z80fiInstrState(Elaboratable):

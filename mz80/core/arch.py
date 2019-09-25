@@ -26,10 +26,7 @@ class Registers(Elaboratable):
         self.input8 = Signal(8)
         self.input16 = Signal(16)
 
-        # self.readRegister8 = Signal.enum(Register8)
-        # self.writeRegister8 = Signal.enum(Register8)
-        # self.readRegister16 = Signal.enum(Register16)
-        # self.writeRegister16 = Signal.enum(Register16)
+        self.addrALUInput = Signal(8)
 
         self.W1 = Signal(8)
         self.W2 = Signal(8)
@@ -171,6 +168,33 @@ class Registers(Elaboratable):
                 m.d.comb += self.output16.eq(self.PC)
             with m.Default():
                 m.d.comb += self.output16.eq(0)
+
+        addrALUInput16 = Signal(16)
+        with m.Switch(self.controls.addrALUInput):
+            with m.Case(Register16.WZ):
+                m.d.comb += addrALUInput16.eq(self.WZ)
+            with m.Case(Register16.BC):
+                m.d.comb += addrALUInput16.eq(self.BC)
+            with m.Case(Register16.DE):
+                m.d.comb += addrALUInput16.eq(self.DE)
+            with m.Case(Register16.HL):
+                with m.If(self.controls.useIX):
+                    m.d.comb += addrALUInput16.eq(self.IX)
+                with m.Elif(self.controls.useIY):
+                    m.d.comb += addrALUInput16.eq(self.IY)
+                with m.Else():
+                    m.d.comb += addrALUInput16.eq(self.HL)
+            with m.Case(Register16.SP):
+                m.d.comb += addrALUInput16.eq(self.SP)
+            with m.Case(Register16.PC):
+                m.d.comb += addrALUInput16.eq(self.PC)
+            with m.Default():
+                m.d.comb += addrALUInput16.eq(0)
+
+        with m.If(self.controls.addrALUInputByte == 0):
+            m.d.comb += self.addrALUInput.eq(addrALUInput16[:8])
+        with m.Else():
+            m.d.comb += self.addrALUInput.eq(addrALUInput16[8:])
 
         with m.If(~conflict):
             with m.Switch(self.controls.writeRegister16):

@@ -21,6 +21,8 @@ class SequencerControls(Record):
                 # registerSet chooses whether we use the W set or the W2 set.
                 ("registerSet", 1, DIR_FANOUT),
                 ("aluFunc", ALUFunc, DIR_FANOUT),
+                ("addrALUInput", Register16, DIR_FANOUT),
+                ("addrALUInputByte", 1, DIR_FANOUT),
             ]))
 
 
@@ -58,6 +60,8 @@ class Register8(Enum):
     A = 11
     F = 12
     TMP = 13
+    OFFSET = 14
+    ADDR_ALU = 15
 
     @classmethod
     def r(cls, value):

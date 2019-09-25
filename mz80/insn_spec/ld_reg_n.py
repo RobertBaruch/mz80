@@ -17,21 +17,42 @@ class ld_reg_n(Elaboratable):
         r = self.actual.instr[3:6]
         n = self.actual.operands.data0
 
-        m.d.comb += self.spec.valid.eq(self.actual.valid & (
-            self.actual.instr.matches("00---110")) & (r != 6))
+        m.d.comb += self.spec.valid.eq(
+            self.actual.valid & self.actual.instr.matches("00---110") & (
+                (r != 6) | (~self.actual.useIX & ~self.actual.useIY)))
 
         m.d.comb += [
+            self.spec.regs_out.eq(self.actual.regs_out),
             self.spec.useIX.eq(self.actual.useIX),
             self.spec.useIY.eq(self.actual.useIY),
-            self.spec.regs_out.eq(self.actual.regs_out),
-            regs_out_r(self.spec, r).eq(n),
-            self.spec.regs_out.PC.eq(self.actual.regs_in.PC + 2),
-            self.spec.mcycles.num.eq(2),
-            self.spec.mcycles.type1.eq(MCycle.M1),
-            self.spec.mcycles.tcycles1.eq(4),
-            self.spec.mcycles.type2.eq(MCycle.MEMRD),
-            self.spec.mcycles.tcycles2.eq(3),
         ]
+
+        with m.If(r != 6):
+            m.d.comb += [
+                regs_out_r(self.spec, r).eq(n),
+                self.spec.regs_out.PC.eq(self.actual.regs_in.PC + 2),
+                self.spec.mcycles.num.eq(2),
+                self.spec.mcycles.type1.eq(MCycle.M1),
+                self.spec.mcycles.tcycles1.eq(4),
+                self.spec.mcycles.type2.eq(MCycle.MEMRD),
+                self.spec.mcycles.tcycles2.eq(3),
+                self.spec.memwrs.num.eq(0),
+            ]
+        with m.Elif(~self.actual.useIX & ~self.actual.useIY):
+            m.d.comb += [
+                self.spec.regs_out.PC.eq(self.actual.regs_in.PC + 2),
+                self.spec.mcycles.num.eq(3),
+                self.spec.mcycles.type1.eq(MCycle.M1),
+                self.spec.mcycles.tcycles1.eq(4),
+                self.spec.mcycles.type2.eq(MCycle.MEMRD),
+                self.spec.mcycles.tcycles2.eq(3),
+                self.spec.mcycles.type3.eq(MCycle.MEMWR),
+                self.spec.mcycles.tcycles3.eq(3),
+                self.spec.memwrs.num.eq(1),
+                self.spec.memwrs.addr0.eq(
+                    Cat(self.actual.regs_in.L1, self.actual.regs_in.H1)),
+                self.spec.memwrs.data0.eq(n),
+            ]
         return m
 
 
@@ -92,6 +113,7 @@ if __name__ == "__main__":
             Assert(spec.regs_out.SP == actual.regs_out.SP),
             Assert(spec.regs_out.PC == actual.regs_out.PC),
             Assert(spec.mcycles.num == actual.mcycles.num),
+            Assert(spec.memwrs.num == actual.memwrs.num),
         ]
         with m.If(spec.mcycles.num >= 1):
             m.d.comb += [
@@ -122,6 +144,22 @@ if __name__ == "__main__":
             m.d.comb += [
                 Assert(spec.mcycles.tcycles6 == actual.mcycles.tcycles6),
                 Assert(spec.mcycles.type6 == actual.mcycles.type6),
+            ]
+
+        with m.If(spec.memwrs.num >= 1):
+            m.d.comb += [
+                Assert(spec.memwrs.addr0 == actual.memwrs.addr0),
+                Assert(spec.memwrs.data0 == actual.memwrs.data0),
+            ]
+        with m.If(spec.memwrs.num >= 2):
+            m.d.comb += [
+                Assert(spec.memwrs.addr1 == actual.memwrs.addr1),
+                Assert(spec.memwrs.data1 == actual.memwrs.data1),
+            ]
+        with m.If(spec.memwrs.num >= 3):
+            m.d.comb += [
+                Assert(spec.memwrs.addr2 == actual.memwrs.addr2),
+                Assert(spec.memwrs.data2 == actual.memwrs.data2),
             ]
 
     main(m, ports=[clk, rst] + z80.ports())

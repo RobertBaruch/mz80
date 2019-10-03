@@ -32,6 +32,8 @@ class Z80(Elaboratable):
         if self.include_z80fi:
             self.z80fi = Z80fiInterface()
 
+        self.mcycler = MCycler()
+
     def ports(self):
         return [
             self.A, self.Din, self.Dout, self.hiz, self.nM1, self.nMREQ,
@@ -41,17 +43,31 @@ class Z80(Elaboratable):
     def elaborate(self, platform):
         addrBus = Signal(16)
         dataBus = Signal(8)
-        controls = SequencerControls()
+        # controls = SequencerControls()
 
         m = Module()
         m.submodules.sequencer = sequencer = Sequencer(
             include_z80fi=self.include_z80fi)
         m.submodules.registers = registers = Registers(
             include_z80fi=self.include_z80fi)
-        m.submodules.mcycler = mcycler = MCycler()
+        m.submodules.mcycler = self.mcycler
         m.submodules.incdec = incdec = IncDec(16)
         m.submodules.alu = alu = ALU(include_z80fi=self.include_z80fi)
         m.submodules.addrALU = addrALU = AddrALU()
+
+        mcycler = self.mcycler
+        controls = sequencer.controls
+
+        m.d.comb += [
+            sequencer.act.eq(mcycler.act),
+            sequencer.dataBusIn.eq(dataBus),
+        ]
+
+        m.d.comb += [
+            registers.input16.eq(incdec.output),
+            registers.input8.eq(dataBus),
+            registers.controls.eq(controls),
+        ]
 
         m.d.comb += [
             mcycler.addr.eq(addrBus),
@@ -59,29 +75,28 @@ class Z80(Elaboratable):
             mcycler.cycle.eq(sequencer.cycle),
             mcycler.extend.eq(sequencer.extend),
             mcycler.busreq.eq(~self.nBUSRQ),
+            mcycler.wdata.eq(dataBus),
         ]
 
         m.d.comb += [
             incdec.input.eq(addrBus),
+            incdec.controls.eq(controls),
+        ]
+
+        # m.d.comb += sequencer.controls.connect(registers.controls,
+        #                                        incdec.controls, alu.controls,
+        #                                        addrALU.controls, controls)
+
+        m.d.comb += [
+            alu.input.eq(dataBus),
+            alu.controls.eq(controls),
         ]
 
         m.d.comb += [
-            sequencer.act.eq(mcycler.act),
-            sequencer.dataBusIn.eq(dataBus),
+            addrALU.input.eq(registers.addrALUInput),
+            addrALU.dataBus.eq(dataBus),
+            addrALU.controls.eq(controls),
         ]
-
-        m.d.comb += sequencer.controls.connect(registers.controls,
-                                               incdec.controls, alu.controls,
-                                               addrALU.controls, controls)
-
-        m.d.comb += [
-            registers.input16.eq(incdec.output),
-            registers.input8.eq(dataBus),
-        ]
-
-        m.d.comb += alu.input.eq(dataBus)
-        m.d.comb += addrALU.input.eq(registers.addrALUInput)
-        m.d.comb += addrALU.dataBus.eq(dataBus)
 
         m.d.comb += [
             self.A.eq(addrBus),
@@ -123,10 +138,16 @@ class Z80(Elaboratable):
         if self.include_z80fi:
             z80registers = Record(
                 RegRecordLayout(DIR_FANIN), name="z80_registers")
+
+            # z80registers <- registers.z80fi, alu.z80fi
             m.d.comb += z80registers.connect(registers.z80fi, alu.z80fi)
+            # z80registers -> sequencer.z80fi.registers
             m.d.comb += sequencer.z80fi.registers.eq(z80registers)
+            # z80registers -> self.z80fi.registers
             m.d.comb += self.z80fi.registers.eq(z80registers)
+            # sequencer.z80fi.control -> self.z80fi.control
             m.d.comb += sequencer.z80fi.control.connect(self.z80fi.control),
+            # self.z80fi.bus -> sequencer.z80fi.bus
             m.d.comb += self.z80fi.bus.connect(sequencer.z80fi.bus),
             m.d.comb += self.z80fi.bus.data.eq(dataBus),
             m.d.comb += self.z80fi.bus.addr.eq(addrBus),
@@ -137,19 +158,37 @@ class Z80(Elaboratable):
 if __name__ == "__main__":
     m = Module()
 
+    clk = Signal()
+    rst = Signal()
+
+    pos = ClockDomain()
+    pos.clk = clk
+    pos.rst = rst
+
+    neg = ClockDomain(clk_edge="neg")
+    neg.clk = clk
+    neg.rst = rst
+
+    m.domains.pos = pos
+    m.domains.neg = neg
+
     m.submodules.z80 = z80 = Z80(include_z80fi=True)
-    m.submodules.z80fi = z80f = Z80fiInstrState()
+    m.submodules.state = state = Z80fiInstrState()
     z80state = Z80fiState()
 
-    m.d.comb += z80.z80fi.connect(z80f.iface)
-    m.d.comb += z80state.connect(z80f.data)
+    m.d.comb += z80.z80fi.connect(state.iface)
+    m.d.comb += z80state.connect(state.data)
 
     with m.If(~z80.nRD & ~z80.nMREQ):
         with m.Switch(z80.A):
             with m.Case(0):
-                m.d.comb += z80.Din.eq(0x0E)
+                m.d.comb += z80.Din.eq(0xDD)
             with m.Case(1):
-                m.d.comb += z80.Din.eq(0xAB)
+                m.d.comb += z80.Din.eq(0x36)
+            with m.Case(2):
+                m.d.comb += z80.Din.eq(0x01)
+            with m.Case(3):
+                m.d.comb += z80.Din.eq(0x02)
             with m.Default():
                 m.d.comb += z80.Din.eq(0x00)
 
@@ -161,26 +200,21 @@ if __name__ == "__main__":
             gtkw_file=open("z80.gtkw", "w"),
             traces=[
                 z80state.valid, z80state.instr, z80state.operands.num,
-                z80state.operands.data0
+                z80state.operands.data0, z80state.operands.data1,
+                z80state.useIX, z80state.useIY, z80.mcycler.mcycle,
+                z80.mcycler.tcycle, z80.mcycler.extend
             ]) as sim:
         sim.add_clock(1e-9, domain="pos")
+        sim.add_clock(1e-9, domain="neg")
+
+        #sim.add_clock(1e-9)
+
 
         def process():
-            # initial reset
-            yield
-            yield
-            yield
-            yield
-            yield
-            yield
-            yield
-            yield
-            yield
-            yield
-            yield
-            yield
-            yield
-            yield
+            for i in range(0, 30):
+                yield Tick(domain="pos")
+                yield Tick(domain="neg")
 
-        sim.add_sync_process(process(), domain="pos")
+        #sim.add_sync_process(process(), domain="pos")
+        sim.add_process(process())
         sim.run()

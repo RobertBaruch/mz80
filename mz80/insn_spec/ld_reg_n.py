@@ -16,10 +16,11 @@ class ld_reg_n(Elaboratable):
 
         r = self.actual.instr[3:6]
         n = self.actual.operands.data0
+        offset8 = self.actual.operands.data1
+        offset = Cat(offset8, Repl(offset8[7], 8))  # sign extend
 
         m.d.comb += self.spec.valid.eq(
-            self.actual.valid & self.actual.instr.matches("00---110") & (
-                (r != 6) | (~self.actual.useIX & ~self.actual.useIY)))
+            self.actual.valid & self.actual.instr.matches("00---110"))
 
         m.d.comb += [
             self.spec.regs_out.eq(self.actual.regs_out),
@@ -53,7 +54,35 @@ class ld_reg_n(Elaboratable):
                     Cat(self.actual.regs_in.L1, self.actual.regs_in.H1)),
                 self.spec.memwrs.data0.eq(n),
             ]
+        with m.Else():
+            addr = Mux(self.actual.useIX, self.actual.regs_in.IX,
+                       self.actual.regs_in.IY)
+            addr += offset
+            m.d.comb += [
+                self.spec.regs_out.PC.eq(self.actual.regs_in.PC + 3),
+                self.spec.mcycles.num.eq(4),
+                self.spec.mcycles.type1.eq(MCycle.M1),
+                self.spec.mcycles.tcycles1.eq(4),
+                self.spec.mcycles.type2.eq(MCycle.MEMRD),
+                self.spec.mcycles.tcycles2.eq(3),
+                self.spec.mcycles.type3.eq(MCycle.MEMRD),
+                self.spec.mcycles.tcycles3.eq(5),
+                self.spec.mcycles.type4.eq(MCycle.MEMWR),
+                self.spec.mcycles.tcycles4.eq(3),
+                self.spec.memwrs.num.eq(1),
+                self.spec.memwrs.addr0.eq(addr),
+                self.spec.memwrs.data0.eq(n),
+            ]
         return m
+
+    def coverage(self, m):
+        return [
+            # Cover(spec.valid & (self.actual.instr[3:6] != 6)),
+            # Cover(spec.valid & (self.actual.instr[3:6] == 6) &
+            #       (~self.actual.useIX & ~self.actual.useIY)),
+            Cover(spec.valid & (self.actual.instr[3:6] == 6) &
+                  (self.actual.useIX == 1)),
+        ]
 
 
 if __name__ == "__main__":
@@ -88,7 +117,7 @@ if __name__ == "__main__":
     m.d.comb += test.actual.connect(state.data)
     m.d.comb += spec.connect(test.spec)
 
-    m.d.comb += Cover(spec.valid)
+    m.d.comb += test.coverage(m)
     # m.d.comb += Cover((count == 59) & spec.valid)
     with m.If(spec.valid):
         m.d.comb += [

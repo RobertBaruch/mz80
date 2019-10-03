@@ -5,7 +5,7 @@ from enum import Enum, unique
 
 
 class SequencerControls(Record):
-    def __init__(self):
+    def __init__(self, name=None):
         super().__init__(
             Layout([
                 ("dataBusSource", DataBusSource, DIR_FANOUT),
@@ -23,7 +23,8 @@ class SequencerControls(Record):
                 ("aluFunc", ALUFunc, DIR_FANOUT),
                 ("addrALUInput", Register16, DIR_FANOUT),
                 ("addrALUInputByte", 1, DIR_FANOUT),
-            ]))
+            ]),
+            name=name)
 
 
 @unique

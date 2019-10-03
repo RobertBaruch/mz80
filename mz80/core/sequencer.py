@@ -16,7 +16,8 @@ class Sequencer(Elaboratable):
 
         self.dataBusIn = Signal(8)
 
-        self.controls = SequencerControls()
+        self.controls = SequencerControls(name="ctrls")
+        self.extended_cycle_controls = SequencerControls(name="extcyc_ctrls")
 
         self.instr = TransparentLatch(8)
 
@@ -25,6 +26,9 @@ class Sequencer(Elaboratable):
         self.memrd_dest = Signal.enum(Register8)
         self.memwr_addr = Signal.enum(Register16)
         self.memwr_src = Signal.enum(Register8)
+        self.useIX = Signal()
+        self.useIY = Signal()
+        self.registerSet = Signal()
 
         #
         # Signals going to the mcycler
@@ -66,10 +70,10 @@ class Sequencer(Elaboratable):
         # every state transition leads to an act.
         with m.FSM(domain="pos", reset="RESET") as fsm:
             # defaults
-            m.d.comb += self.controls.writeRegister16.eq(Register16.NONE)
-            m.d.comb += self.controls.writeRegister8.eq(Register8.NONE)
-            m.d.comb += self.controls.addrIncDecSetting.eq(IncDecSetting.ZERO)
-            m.d.comb += self.controls.addrALUInputByte.eq(0)
+            m.d.comb += self.controls.eq(0)
+            m.d.comb += self.controls.useIX.eq(self.useIX)
+            m.d.comb += self.controls.useIY.eq(self.useIY)
+            m.d.comb += self.controls.registerSet.eq(self.registerSet)
 
             if self.include_z80fi:
                 m.d.comb += self.z80fi.control.add_operand.eq(0)
@@ -86,7 +90,9 @@ class Sequencer(Elaboratable):
                 m.d.comb += self.z80fi.control.clear.eq(0)
 
             with m.State("RESET"):
-                m.d.pos += self.controls.registerSet.eq(0)
+                m.d.pos += self.useIX.eq(0)
+                m.d.pos += self.useIY.eq(0)
+                m.d.pos += self.registerSet.eq(0)
                 self.initiateInstructionFetch(m)
 
             with m.State("M1_T1"):
@@ -141,6 +147,7 @@ class Sequencer(Elaboratable):
                 self.execute(m)
 
             with m.State("EXTENDED"):
+                m.d.comb += self.controls.eq(self.extended_cycle_controls)
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                 self.execute(m)
@@ -236,8 +243,8 @@ class Sequencer(Elaboratable):
         This resets any setting from prefixes and resets the cycle number.
         """
         self.initiateOpcodeFetch(m)
-        m.d.pos += self.controls.useIX.eq(0)
-        m.d.pos += self.controls.useIY.eq(0)
+        m.d.pos += self.useIX.eq(0)
+        m.d.pos += self.useIY.eq(0)
         m.d.pos += self.instr.en.eq(1)
         m.d.pos += self.cycle_num.eq(0)
 
@@ -302,31 +309,41 @@ class Sequencer(Elaboratable):
 
     def aluAddrAddLow(self, m, reg16operand, reg_dest):
         self.extendCycle(m)
-        m.d.comb += self.controls.addrALUInput.eq(reg16operand)
-        m.d.comb += self.controls.addrALUInputByte.eq(0)
-        m.d.pos += self.memrd_dest.eq(reg_dest)
+        m.d.pos += self.extended_cycle_controls.addrALUInput.eq(reg16operand)
+        m.d.pos += self.extended_cycle_controls.addrALUInputByte.eq(0)
+        m.d.pos += self.extended_cycle_controls.readRegister8.eq(
+            Register8.ADDR_ALU)
+        m.d.pos += self.extended_cycle_controls.writeRegister8.eq(reg_dest)
 
     def aluAddrAddHigh(self, m, reg16operand, reg_dest):
         self.extendCycle(m)
-        m.d.comb += self.controls.addrALUInput.eq(reg16operand)
-        m.d.comb += self.controls.addrALUInputByte.eq(1)
-        m.d.pos += self.memrd_dest.eq(reg_dest)
+        m.d.pos += self.extended_cycle_controls.addrALUInput.eq(reg16operand)
+        m.d.pos += self.extended_cycle_controls.addrALUInputByte.eq(1)
+        m.d.pos += self.extended_cycle_controls.readRegister8.eq(
+            Register8.ADDR_ALU)
+        m.d.pos += self.extended_cycle_controls.writeRegister8.eq(reg_dest)
 
     def extendCycle(self, m):
+        m.next = "EXTENDED"
         m.d.comb += self.extend.eq(1)
+        m.d.pos += self.extended_cycle_controls.eq(0)
+        m.d.pos += self.extended_cycle_controls.useIX.eq(self.useIX)
+        m.d.pos += self.extended_cycle_controls.useIY.eq(self.useIY)
+        m.d.pos += self.extended_cycle_controls.registerSet.eq(
+            self.registerSet)
 
     def execute(self, m):
         m.d.pos += self.cycle_num.eq(self.cycle_num + 1)
         with m.Switch(self.instr.output):
             with m.Case(0xDD):
-                m.d.pos += self.controls.useIX.eq(1)
-                m.d.pos += self.controls.useIY.eq(0)
+                m.d.pos += self.useIX.eq(1)
+                m.d.pos += self.useIY.eq(0)
                 m.d.pos += self.cycle_num.eq(0)
                 self.initiateOpcodeFetch(m)
 
             with m.Case(0xFD):
-                m.d.pos += self.controls.useIX.eq(0)
-                m.d.pos += self.controls.useIY.eq(1)
+                m.d.pos += self.useIX.eq(0)
+                m.d.pos += self.useIY.eq(1)
                 m.d.pos += self.cycle_num.eq(0)
                 self.initiateOpcodeFetch(m)
 
@@ -388,13 +405,10 @@ class Sequencer(Elaboratable):
                 self.initiateOperandReadInto(m, Register8.OFFSET)
             with m.Elif(self.cycle_num == 1):
                 self.initiateOperandReadInto(m, Register8.TMP)
-                self.extendCycle(m)
             with m.Elif(self.cycle_num == 2):
                 self.aluAddrAddLow(m, Register16.HL, Register8.W)
-                self.extendCycle(m)
             with m.Elif(self.cycle_num == 3):
                 self.aluAddrAddHigh(m, Register16.HL, Register8.Z)
-                self.extendCycle(m)
             with m.Elif(self.cycle_num == 4):
                 self.initiateMemWrite(m, Register16.WZ, Register8.TMP)
             with m.Else():

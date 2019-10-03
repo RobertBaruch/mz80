@@ -37,11 +37,11 @@ class ALU(Elaboratable):
 
         with m.Switch(self.controls.readRegister8):
             with m.Case(Register8.A):
-                m.d.pos += self.output.eq(A[self.controls.registerSet])
+                m.d.comb += self.output.eq(A[self.controls.registerSet])
             with m.Case(Register8.F):
-                m.d.pos += self.output.eq(F[self.controls.registerSet])
+                m.d.comb += self.output.eq(F[self.controls.registerSet])
             with m.Case(Register8.TMP):
-                m.d.pos += self.output.eq(TMP)
+                m.d.comb += self.output.eq(TMP)
 
         if self.include_z80fi:
             regs = self.z80fi

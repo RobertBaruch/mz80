@@ -1,6 +1,8 @@
 from nmigen import *
 from nmigen.cli import main
 from nmigen.asserts import *
+from nmigen.back import pysim
+from nmigen.hdl.ast import Tick
 
 
 # module edgelord outputs the state of the clock without using
@@ -81,4 +83,24 @@ if __name__ == "__main__":
     m.domains.neg = neg
     m.submodules.edgelord = edgelord
 
-    main(m, ports=[clk, rst, edgelord.clk_state], platform="formal")
+    with pysim.Simulator(
+            m,
+            vcd_file=open("edgelord.vcd", "w"),
+            gtkw_file=open("edgelord.gtkw", "w"),
+            traces=[clk, rst, edgelord.clk_state]) as sim:
+        sim.add_clock(1e-9, domain="pos")
+        sim.add_clock(1e-9, domain="neg")
+
+        #sim.add_clock(1e-9)
+
+
+        def process():
+            for i in range(0, 30):
+                yield Tick(domain="pos")
+                yield Tick(domain="neg")
+
+        #sim.add_sync_process(process(), domain="pos")
+        sim.add_process(process())
+        sim.run()
+
+    #main(m, ports=[clk, rst, edgelord.clk_state], platform="formal")

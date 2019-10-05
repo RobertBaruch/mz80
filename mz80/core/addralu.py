@@ -14,20 +14,20 @@ class AddrALU(Elaboratable):
 
         self.input = Signal(8)
         self.dataBus = Signal(8)
-        self.output = Signal(8)
+        self.dataBusOut = Signal(8)
 
         self.offset = Signal(8)
         self.carry = Signal()
         self.result = Signal(9)
 
     def ports(self):
-        return [self.input, self.dataBus, self.output]
+        return [self.input, self.dataBus, self.dataBusOut]
 
     def elaborate(self, platform):
         m = Module()
 
         m.d.comb += self.result.eq(self.offset + self.input + self.carry)
-        m.d.comb += self.output.eq(self.result[0:8])
+        m.d.comb += self.dataBusOut.eq(self.result[0:8])
 
         with m.If(self.controls.writeRegister8 == Register8.OFFSET):
             m.d.pos += self.offset.eq(self.dataBus)
@@ -67,8 +67,8 @@ class AddrALU(Elaboratable):
 
         outputLow = Signal(8)
         outputHigh = Signal(8)
-        m.d.comb += outputLow.eq(Past(self.output))
-        m.d.comb += outputHigh.eq(self.output)
+        m.d.comb += outputLow.eq(Past(self.dataBusOut))
+        m.d.comb += outputHigh.eq(self.dataBusOut)
         output16 = Cat(outputLow, outputHigh)
 
         m.d.comb += Assume(~(loadOffset & continueAdd))

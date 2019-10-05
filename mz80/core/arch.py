@@ -21,7 +21,7 @@ class Registers(Elaboratable):
         # self.useIX = Signal()
         # self.useIY = Signal()
 
-        self.output8 = Signal(8)
+        self.dataBusOut = Signal(8)
         self.output16 = Signal(16)
         self.input8 = Signal(8)
         self.input16 = Signal(16)
@@ -81,35 +81,35 @@ class Registers(Elaboratable):
 
         with m.Switch(self.controls.readRegister8):
             with m.Case(Register8.W):
-                m.d.comb += self.output8.eq(self.W[self.controls.registerSet])
+                m.d.comb += self.dataBusOut.eq(self.W[self.controls.registerSet])
             with m.Case(Register8.Z):
-                m.d.comb += self.output8.eq(self.Z[self.controls.registerSet])
+                m.d.comb += self.dataBusOut.eq(self.Z[self.controls.registerSet])
             with m.Case(Register8.B):
-                m.d.comb += self.output8.eq(self.B[self.controls.registerSet])
+                m.d.comb += self.dataBusOut.eq(self.B[self.controls.registerSet])
             with m.Case(Register8.C):
-                m.d.comb += self.output8.eq(self.C[self.controls.registerSet])
+                m.d.comb += self.dataBusOut.eq(self.C[self.controls.registerSet])
             with m.Case(Register8.D):
-                m.d.comb += self.output8.eq(self.D[self.controls.registerSet])
+                m.d.comb += self.dataBusOut.eq(self.D[self.controls.registerSet])
             with m.Case(Register8.E):
-                m.d.comb += self.output8.eq(self.E[self.controls.registerSet])
+                m.d.comb += self.dataBusOut.eq(self.E[self.controls.registerSet])
             with m.Case(Register8.H):
                 with m.If(self.controls.useIX):
-                    m.d.comb += self.output8.eq(self.IXh)
+                    m.d.comb += self.dataBusOut.eq(self.IXh)
                 with m.Elif(self.controls.useIY):
-                    m.d.comb += self.output8.eq(self.IYh)
+                    m.d.comb += self.dataBusOut.eq(self.IYh)
                 with m.Else():
-                    m.d.comb += self.output8.eq(
+                    m.d.comb += self.dataBusOut.eq(
                         self.H[self.controls.registerSet])
             with m.Case(Register8.L):
                 with m.If(self.controls.useIX):
-                    m.d.comb += self.output8.eq(self.IXl)
+                    m.d.comb += self.dataBusOut.eq(self.IXl)
                 with m.Elif(self.controls.useIY):
-                    m.d.comb += self.output8.eq(self.IYl)
+                    m.d.comb += self.dataBusOut.eq(self.IYl)
                 with m.Else():
-                    m.d.comb += self.output8.eq(
+                    m.d.comb += self.dataBusOut.eq(
                         self.L[self.controls.registerSet])
             with m.Default():
-                m.d.comb += self.output8.eq(0)
+                m.d.comb += self.dataBusOut.eq(0)
 
         with m.If(~conflict):
             with m.Switch(self.controls.writeRegister8):

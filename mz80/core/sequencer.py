@@ -74,6 +74,7 @@ class Sequencer(Elaboratable):
             m.d.comb += self.controls.useIX.eq(self.useIX)
             m.d.comb += self.controls.useIY.eq(self.useIY)
             m.d.comb += self.controls.registerSet.eq(self.registerSet)
+            m.d.comb += self.controls.readRegister8.eq(Register8.NONE)
 
             if self.include_z80fi:
                 m.d.comb += self.z80fi.control.add_operand.eq(0)
@@ -97,6 +98,8 @@ class Sequencer(Elaboratable):
 
             with m.State("M1_T1"):
                 m.d.comb += self.controls.readRegister16.eq(Register16.PC)
+                m.d.comb += self.controls.readRegister8.eq(
+                    Register8.MCYCLER_RDATA)
 
                 if self.include_z80fi:
                     # Take a snapshot of the state. This is the state coming out
@@ -111,6 +114,9 @@ class Sequencer(Elaboratable):
             # This state can be waitstated. If waitstated, self.act will be 0.
             with m.State("M1_T2"):
                 m.d.comb += self.controls.readRegister16.eq(Register16.PC)
+                m.d.comb += self.controls.readRegister8.eq(
+                    Register8.MCYCLER_RDATA)
+
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.clear.eq(1)
                     m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.M1)
@@ -154,6 +160,8 @@ class Sequencer(Elaboratable):
 
             with m.State("RDOPERAND_T1"):
                 m.d.comb += self.controls.readRegister16.eq(Register16.PC)
+                m.d.comb += self.controls.readRegister8.eq(
+                    Register8.MCYCLER_RDATA)
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.MEMRD)
                 m.next = "RDOPERAND_T2"
@@ -161,6 +169,8 @@ class Sequencer(Elaboratable):
             # This state can be waitstated. If waitstated, self.act will be 0.
             with m.State("RDOPERAND_T2"):
                 m.d.comb += self.controls.readRegister16.eq(Register16.PC)
+                m.d.comb += self.controls.readRegister8.eq(
+                    Register8.MCYCLER_RDATA)
                 with m.If(self.act):
                     if self.include_z80fi:
                         m.d.comb += self.z80fi.control.add_tcycle.eq(1)
@@ -171,6 +181,8 @@ class Sequencer(Elaboratable):
                 m.d.comb += self.controls.addrIncDecSetting.eq(
                     IncDecSetting.INC)
                 m.d.comb += self.controls.writeRegister16.eq(Register16.PC)
+                m.d.comb += self.controls.readRegister8.eq(
+                    Register8.MCYCLER_RDATA)
                 m.d.comb += self.controls.writeRegister8.eq(self.memrd_dest)
                 self.execute(m)
 
@@ -182,6 +194,8 @@ class Sequencer(Elaboratable):
 
             with m.State("RDMEM_T1"):
                 m.d.comb += self.controls.readRegister16.eq(self.memrd_addr)
+                m.d.comb += self.controls.readRegister8.eq(
+                    Register8.MCYCLER_RDATA)
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.MEMRD)
                 m.next = "RDMEM_T2"
@@ -189,6 +203,8 @@ class Sequencer(Elaboratable):
             # This state can be waitstated. If waitstated, self.act will be 0.
             with m.State("RDMEM_T2"):
                 m.d.comb += self.controls.readRegister16.eq(self.memrd_addr)
+                m.d.comb += self.controls.readRegister8.eq(
+                    Register8.MCYCLER_RDATA)
                 with m.If(self.act):
                     if self.include_z80fi:
                         m.d.comb += self.z80fi.control.add_tcycle.eq(1)
@@ -196,6 +212,8 @@ class Sequencer(Elaboratable):
 
             with m.State("RDMEM_T3"):
                 m.d.comb += self.controls.readRegister16.eq(self.memrd_addr)
+                m.d.comb += self.controls.readRegister8.eq(
+                    Register8.MCYCLER_RDATA)
                 m.d.comb += self.controls.writeRegister8.eq(self.memrd_dest)
                 self.execute(m)
 

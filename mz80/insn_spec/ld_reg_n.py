@@ -107,10 +107,13 @@ if __name__ == "__main__":
 
     actual = Z80fiState()
     spec = Z80fiState()
-    count = Signal.range(0, 61)
+    count = Signal.range(0, 61, reset_less=True)
 
     with m.If(count < 60):
         m.d.pos += count.eq(count + 1)
+
+    m.d.comb += Assume(z80.nBUSRQ == 1)
+    m.d.comb += Assume(ResetSignal("pos") == (count < 4))
 
     m.d.comb += z80.z80fi.connect(state.iface)
     m.d.comb += actual.connect(state.data)

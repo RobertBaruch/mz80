@@ -4,11 +4,13 @@ from nmigen.cli import main
 from nmigen.asserts import *
 
 from .edgelord import Edgelord
-from .muxing import MCycle
+from .muxing import *
 
 class MCycler(Elaboratable):
     def __init__(self):
         self.LATCHING = Const(0)
+
+        self.controls = SequencerControls()
 
         #
         # Signals eventually going outside
@@ -70,6 +72,7 @@ class MCycler(Elaboratable):
         # registered on the positive edge of the clock.
         self.act = Signal()
         self.rdata = Signal(8)
+        self.dataBusOut = Signal(8)
 
         # Signals indicating state
         self.mcycle = Signal.enum(MCycle)
@@ -113,6 +116,11 @@ class MCycler(Elaboratable):
                 self.latched_refresh_addr.eq(self.refresh_addr),
                 self.latched_wdata.eq(self.wdata),
             ]
+
+        with m.If(self.controls.readRegister8 == Register8.MCYCLER_RDATA):
+            m.d.comb += self.dataBusOut.eq(self.rdata)
+        with m.Else():
+            m.d.comb += self.dataBusOut.eq(0)
 
         with m.FSM(domain="pos", reset="RESET") as fsm:
             # Defaults
@@ -221,8 +229,8 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.MEMRD),
                     self.tcycle.eq(2),
                     self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
-                    self.mreq.eq(~self.c),
-                    self.rd.eq(~self.c),
+                    self.mreq.eq(1),
+                    self.rd.eq(1),
                     self.rdata.eq(self.latched_rdata),
                 ]
                 m.d.pos += self.tcycles.eq(2)

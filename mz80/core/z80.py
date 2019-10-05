@@ -122,13 +122,13 @@ class Z80(Elaboratable):
                 controls.readRegister8.matches(
                     Register8.B, Register8.C, Register8.D, Register8.E,
                     Register8.H, Register8.L, Register8.W, Register8.Z)):
-            m.d.comb += dataBus.eq(registers.output8)
+            m.d.comb += dataBus.eq(registers.dataBusOut)
         with m.Elif(
                 controls.readRegister8.matches(Register8.A, Register8.F,
                                                Register8.TMP)):
-            m.d.comb += dataBus.eq(alu.output)
+            m.d.comb += dataBus.eq(alu.dataBusOut)
         with m.Elif(controls.readRegister8.matches(Register8.ADDR_ALU)):
-            m.d.comb += dataBus.eq(addrALU.output)
+            m.d.comb += dataBus.eq(addrALU.dataBusOut)
         with m.Else():
             with m.If(mcycler.rd):
                 m.d.comb += dataBus.eq(self.Din)

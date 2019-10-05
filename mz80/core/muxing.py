@@ -63,6 +63,7 @@ class Register8(Enum):
     TMP = 13
     OFFSET = 14
     ADDR_ALU = 15
+    MCYCLER_RDATA = 16
 
     @classmethod
     def r(cls, value):

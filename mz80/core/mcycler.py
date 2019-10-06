@@ -60,8 +60,7 @@ class MCycler(Elaboratable):
 
         self.extend = Signal()
         self.cycle = Signal.enum(MCycle)
-        self.addr = Signal(16)
-        self.refresh_addr = Signal(16)
+        self.addrBusIn = Signal(16)
         self.dataBusIn = Signal(8)
 
         #
@@ -97,8 +96,8 @@ class MCycler(Elaboratable):
         return [
             self.A, self.Din, self.Dout, self.ddir, self.busreq, self.buswait,
             self.mreq, self.iorq, self.rd, self.wr, self.A, self.m1, self.rfsh,
-            self.busack, self.hiz, self.extend, self.cycle, self.addr,
-            self.refresh_addr, self.dataBusIn, self.act, self.rdata, self.mcycle,
+            self.busack, self.hiz, self.extend, self.cycle, self.addrBusIn,
+            self.dataBusIn, self.act, self.rdata, self.mcycle,
             self.tcycle, self.tcycles
         ]
 
@@ -116,8 +115,8 @@ class MCycler(Elaboratable):
         self.c = self.edgelord.clk_state
         with m.If(self.mcycle_done):
             m.d.pos += [
-                self.latched_addr.eq(self.addr),
-                self.latched_refresh_addr.eq(self.refresh_addr),
+                self.latched_addr.eq(self.addrBusIn),
+                self.latched_refresh_addr.eq(self.addrBusIn),
                 self.latched_wdata.eq(self.dataBusIn),
             ]
 
@@ -160,7 +159,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.M1),
                     self.tcycle.eq(1),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.mreq.eq(~self.c),
                     self.m1.eq(1),
                     self.rd.eq(~self.c),
@@ -173,7 +172,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.M1),
                     self.tcycle.eq(2),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.mreq.eq(1),
                     self.m1.eq(1),
                     self.rd.eq(1),
@@ -190,7 +189,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.M1),
                     self.tcycle.eq(3),
-                    self.A.eq(Mux(self.LATCHING, self.latched_refresh_addr, self.refresh_addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_refresh_addr, self.addrBusIn)),
                     self.mreq.eq(~self.c),
                 ]
                 m.d.comb += self.rdata.eq(self.pos_latched_Din),
@@ -201,7 +200,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.M1),
                     self.tcycle.eq(4),
-                    self.A.eq(Mux(self.LATCHING, self.latched_refresh_addr, self.refresh_addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_refresh_addr, self.addrBusIn)),
                     self.mreq.eq(self.c),
                 ]
                 m.d.comb += self.rdata.eq(self.pos_latched_Din),
@@ -211,7 +210,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.M1),
                     self.tcycle.eq(5),
-                    self.A.eq(Mux(self.LATCHING, self.latched_refresh_addr, self.refresh_addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_refresh_addr, self.addrBusIn)),
                 ]
                 m.d.comb += self.rdata.eq(self.pos_latched_Din),
                 self.endCycle(m, self.cycle)
@@ -220,7 +219,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.MEMRD),
                     self.tcycle.eq(1),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.mreq.eq(~self.c),
                     self.rd.eq(~self.c),
                 ]
@@ -232,7 +231,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.MEMRD),
                     self.tcycle.eq(2),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.mreq.eq(1),
                     self.rd.eq(1),
                 ]
@@ -247,7 +246,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.MEMRD),
                     self.tcycle.eq(3),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.mreq.eq(self.c),
                     self.rd.eq(self.c),
                 ]
@@ -258,7 +257,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.MEMRD),
                     self.tcycle.eq(4),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                 ]
                 m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 self.endCycle(m, self.cycle)
@@ -268,7 +267,7 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.MEMWR),
                     self.tcycle.eq(1),
                     self.ddir.eq(~self.c),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.Dout.eq(Mux(self.LATCHING, self.latched_wdata, self.dataBusIn)),
                     self.mreq.eq(~self.c),
                 ]
@@ -280,7 +279,7 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.MEMWR),
                     self.tcycle.eq(2),
                     self.ddir.eq(1),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.Dout.eq(Mux(self.LATCHING, self.latched_wdata, self.dataBusIn)),
                     self.mreq.eq(1),
                     self.wr.eq(~self.c),
@@ -296,7 +295,7 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.MEMWR),
                     self.tcycle.eq(2),
                     self.ddir.eq(1),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.Dout.eq(Mux(self.LATCHING, self.latched_wdata, self.dataBusIn)),
                     self.mreq.eq(1),
                     self.wr.eq(1),
@@ -312,7 +311,7 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.MEMWR),
                     self.tcycle.eq(3),
                     self.ddir.eq(1),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.Dout.eq(Mux(self.LATCHING, self.latched_wdata, self.dataBusIn)),
                     self.mreq.eq(self.c),
                     self.wr.eq(self.c),
@@ -323,7 +322,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.MEMWR),
                     self.tcycle.eq(4),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.Dout.eq(Mux(self.LATCHING, self.latched_wdata, self.dataBusIn)),
                 ]
                 self.endCycle(m, self.cycle)
@@ -332,7 +331,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.IORD),
                     self.tcycle.eq(1),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                 ]
                 m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 m.d.pos += self.tcycles.eq(1)
@@ -342,7 +341,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.IORD),
                     self.tcycle.eq(2),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.iorq.eq(1),
                     self.rd.eq(1),
                 ]
@@ -354,7 +353,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.IORD),
                     self.tcycle.eq(2),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.iorq.eq(1),
                     self.rd.eq(1),
                 ]
@@ -369,7 +368,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.IORD),
                     self.tcycle.eq(3),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.iorq.eq(self.c),
                     self.rd.eq(self.c),
                 ]
@@ -380,7 +379,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.IORD),
                     self.tcycle.eq(4),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                 ]
                 m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 self.endCycle(m, self.cycle)
@@ -390,7 +389,7 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.IOWR),
                     self.tcycle.eq(1),
                     self.ddir.eq(~self.c),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.Dout.eq(Mux(self.LATCHING, self.latched_wdata, self.dataBusIn)),
                 ]
                 m.d.pos += self.tcycles.eq(1)
@@ -401,7 +400,7 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.IOWR),
                     self.tcycle.eq(2),
                     self.ddir.eq(1),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.Dout.eq(Mux(self.LATCHING, self.latched_wdata, self.dataBusIn)),
                     self.iorq.eq(1),
                     self.wr.eq(1),
@@ -414,7 +413,7 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.IOWR),
                     self.tcycle.eq(2),
                     self.ddir.eq(1),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.Dout.eq(Mux(self.LATCHING, self.latched_wdata, self.dataBusIn)),
                     self.iorq.eq(1),
                     self.wr.eq(1),
@@ -430,7 +429,7 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.IOWR),
                     self.tcycle.eq(3),
                     self.ddir.eq(1),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.Dout.eq(Mux(self.LATCHING, self.latched_wdata, self.dataBusIn)),
                     self.iorq.eq(self.c),
                     self.wr.eq(self.c),
@@ -441,7 +440,7 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.IOWR),
                     self.tcycle.eq(4),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
                     self.Dout.eq(Mux(self.LATCHING, self.latched_wdata, self.dataBusIn)),
                 ]
                 self.endCycle(m, self.cycle)
@@ -643,7 +642,7 @@ class MCycler(Elaboratable):
             # Ensure that latched_addr during T1 is addr(T1-1^).
             with m.If(self.tcycle == 1):
                 m.d.comb += Assert(
-                    self.latched_addr == Past(self.addr, domain="pos"))
+                    self.latched_addr == Past(self.addrBusIn, domain="pos"))
 
             # Ensure that latched_addr is stable from T2 through the end.
             with m.If(self.tcycle > 1):
@@ -684,7 +683,7 @@ class MCycler(Elaboratable):
             # Ensure that latched_addr during T1 is addr(T1-1^).
             with m.If(self.tcycle == 1):
                 m.d.comb += Assert(
-                    self.latched_addr == Past(self.addr, domain="pos"))
+                    self.latched_addr == Past(self.addrBusIn, domain="pos"))
 
             # Ensure that latched_addr is stable from T2 through the end.
             with m.If(self.tcycle > 1):
@@ -735,7 +734,7 @@ class MCycler(Elaboratable):
             # Ensure that latched_addr during T1 is addr(T1-1^).
             with m.If(self.tcycle == 1):
                 m.d.comb += Assert(
-                    self.latched_addr == Past(self.addr, domain="pos"))
+                    self.latched_addr == Past(self.addrBusIn, domain="pos"))
 
             # Ensure that latched_addr is stable from T2 through the end.
             with m.If(self.tcycle > 1):
@@ -776,7 +775,7 @@ class MCycler(Elaboratable):
             # Ensure that latched_addr during T1 is addr(T1-1^).
             with m.If(self.tcycle == 1):
                 m.d.comb += Assert(
-                    self.latched_addr == Past(self.addr, domain="pos"))
+                    self.latched_addr == Past(self.addrBusIn, domain="pos"))
 
             # Ensure that latched_addr is stable from T2 through the end.
             with m.If(self.tcycle > 1):

@@ -70,8 +70,7 @@ class Z80(Elaboratable):
         ]
 
         m.d.comb += [
-            mcycler.addr.eq(addrBus),
-            mcycler.refresh_addr.eq(addrBus),
+            mcycler.addrBusIn.eq(addrBus),
             mcycler.cycle.eq(sequencer.cycle),
             mcycler.extend.eq(sequencer.extend),
             mcycler.busreq.eq(~self.nBUSRQ),

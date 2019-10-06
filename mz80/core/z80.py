@@ -77,16 +77,13 @@ class Z80(Elaboratable):
             mcycler.busreq.eq(~self.nBUSRQ),
             mcycler.wdata.eq(dataBus),
             mcycler.Din.eq(self.Din),
+            mcycler.controls.eq(controls),
         ]
 
         m.d.comb += [
             incdec.input.eq(addrBus),
             incdec.controls.eq(controls),
         ]
-
-        # m.d.comb += sequencer.controls.connect(registers.controls,
-        #                                        incdec.controls, alu.controls,
-        #                                        addrALU.controls, controls)
 
         m.d.comb += [
             alu.input.eq(dataBus),
@@ -119,29 +116,8 @@ class Z80(Elaboratable):
         with m.Else():
             m.d.comb += addrBus.eq(0xFFFF)
 
-        # dataBuffIn = Signal(8)
-        # with m.If(controls.readRegister8 == Register8.MCYCLER_RDATA):
-        #     m.d.comb += dataBuffIn.eq()
-        with m.If(
-                controls.readRegister8.matches(
-                    Register8.B, Register8.C, Register8.D, Register8.E,
-                    Register8.H, Register8.L, Register8.W, Register8.Z)):
-            m.d.comb += dataBus.eq(registers.dataBusOut)
-        with m.Elif(
-                controls.readRegister8.matches(Register8.A, Register8.F,
-                                               Register8.TMP)):
-            m.d.comb += dataBus.eq(alu.dataBusOut)
-        with m.Elif(controls.readRegister8.matches(Register8.ADDR_ALU)):
-            m.d.comb += dataBus.eq(addrALU.dataBusOut)
-        # with m.Elif(controls.readRegister8.matches(Register8.MCYCLER_RDATA)):
-        #     m.d.comb += dataBus.eq(mcycler.rdata)
-        with m.Else():
-            m.d.comb += dataBus.eq(mcycler.rdata)
-        # with m.Else():
-        #     with m.If(mcycler.rd):
-        #         m.d.comb += dataBus.eq(self.Din)
-        #     with m.Else():
-        #         m.d.comb += dataBus.eq(0xFF)
+        m.d.comb += dataBus.eq(registers.dataBusOut | alu.dataBusOut
+                               | addrALU.dataBusOut | mcycler.dataBusOut)
 
         if self.include_z80fi:
             z80registers = Record(

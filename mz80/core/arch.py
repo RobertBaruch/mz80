@@ -22,7 +22,7 @@ class Registers(Elaboratable):
         # self.useIY = Signal()
 
         self.dataBusOut = Signal(8)
-        self.output16 = Signal(16)
+        self.addrBusOut = Signal(16)
         self.dataBusIn = Signal(8)
         self.input16 = Signal(16)
 
@@ -150,24 +150,24 @@ class Registers(Elaboratable):
 
         with m.Switch(self.controls.readRegister16):
             with m.Case(Register16.WZ):
-                m.d.comb += self.output16.eq(self.WZ)
+                m.d.comb += self.addrBusOut.eq(self.WZ)
             with m.Case(Register16.BC):
-                m.d.comb += self.output16.eq(self.BC)
+                m.d.comb += self.addrBusOut.eq(self.BC)
             with m.Case(Register16.DE):
-                m.d.comb += self.output16.eq(self.DE)
+                m.d.comb += self.addrBusOut.eq(self.DE)
             with m.Case(Register16.HL):
                 with m.If(self.controls.useIX):
-                    m.d.comb += self.output16.eq(self.IX)
+                    m.d.comb += self.addrBusOut.eq(self.IX)
                 with m.Elif(self.controls.useIY):
-                    m.d.comb += self.output16.eq(self.IY)
+                    m.d.comb += self.addrBusOut.eq(self.IY)
                 with m.Else():
-                    m.d.comb += self.output16.eq(self.HL)
+                    m.d.comb += self.addrBusOut.eq(self.HL)
             with m.Case(Register16.SP):
-                m.d.comb += self.output16.eq(self.SP)
+                m.d.comb += self.addrBusOut.eq(self.SP)
             with m.Case(Register16.PC):
-                m.d.comb += self.output16.eq(self.PC)
+                m.d.comb += self.addrBusOut.eq(self.PC)
             with m.Default():
-                m.d.comb += self.output16.eq(0)
+                m.d.comb += self.addrBusOut.eq(0)
 
         addrALUInput16 = Signal(16)
         with m.Switch(self.controls.addrALUInput):

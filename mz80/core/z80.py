@@ -64,7 +64,7 @@ class Z80(Elaboratable):
         ]
 
         m.d.comb += [
-            registers.input16.eq(incdec.output),
+            registers.input16.eq(incdec.busOut),
             registers.dataBusIn.eq(dataBus),
             registers.controls.eq(controls),
         ]
@@ -81,7 +81,7 @@ class Z80(Elaboratable):
         ]
 
         m.d.comb += [
-            incdec.input.eq(addrBus),
+            incdec.busIn.eq(addrBus),
             incdec.controls.eq(controls),
         ]
 
@@ -108,14 +108,7 @@ class Z80(Elaboratable):
             self.nBUSAK.eq(~mcycler.busack),
         ]
 
-        with m.If(
-                controls.readRegister16.matches(Register16.WZ, Register16.BC,
-                                                Register16.DE, Register16.HL,
-                                                Register16.SP, Register16.PC)):
-            m.d.comb += addrBus.eq(registers.output16)
-        with m.Else():
-            m.d.comb += addrBus.eq(0xFFFF)
-
+        m.d.comb += addrBus.eq(registers.addrBusOut)
         m.d.comb += dataBus.eq(registers.dataBusOut | alu.dataBusOut
                                | addrALU.dataBusOut | mcycler.dataBusOut)
 

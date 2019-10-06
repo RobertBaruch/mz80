@@ -75,6 +75,7 @@ class Sequencer(Elaboratable):
             m.d.comb += self.controls.useIY.eq(self.useIY)
             m.d.comb += self.controls.registerSet.eq(self.registerSet)
             m.d.comb += self.controls.readRegister8.eq(Register8.NONE)
+            m.d.comb += self.controls.incR.eq(0)
 
             if self.include_z80fi:
                 m.d.comb += self.z80fi.control.add_operand.eq(0)
@@ -141,13 +142,14 @@ class Sequencer(Elaboratable):
                     m.next = "M1_T3"
 
             with m.State("M1_T3"):
-                m.d.comb += self.controls.readRegister16.eq(Register16.NONE)
+                m.d.comb += self.controls.readRegister16.eq(Register16.R)
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                 m.next = "M1_T4"
 
             with m.State("M1_T4"):
-                m.d.comb += self.controls.readRegister16.eq(Register16.NONE)
+                m.d.comb += self.controls.readRegister16.eq(Register16.R)
+                m.d.comb += self.controls.incR.eq(1)
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                 self.execute(m)

@@ -23,6 +23,7 @@ class SequencerControls(Record):
                 ("aluFunc", ALUFunc, DIR_FANOUT),
                 ("addrALUInput", Register16, DIR_FANOUT),
                 ("addrALUInputByte", 1, DIR_FANOUT),
+                ("incR", 1, DIR_FANOUT),
             ]),
             name=name)
 
@@ -83,6 +84,8 @@ class Register16(Enum):
     SP = 5
     PC = 6
     ADDR_ALU = 7
+    I = 8
+    R = 9
 
 
 @unique

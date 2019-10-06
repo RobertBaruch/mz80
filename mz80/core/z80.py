@@ -10,6 +10,7 @@ from .incdec import IncDec
 from .mcycler import MCycler
 from .muxing import *
 from .addralu import AddrALU
+from .ir import IR
 from ..z80fi.z80fi import *
 
 
@@ -54,6 +55,7 @@ class Z80(Elaboratable):
         m.submodules.incdec = incdec = IncDec(16)
         m.submodules.alu = alu = ALU(include_z80fi=self.include_z80fi)
         m.submodules.addrALU = addrALU = AddrALU()
+        m.submodules.ir = ir = IR()
 
         mcycler = self.mcycler
         controls = sequencer.controls
@@ -96,6 +98,11 @@ class Z80(Elaboratable):
         ]
 
         m.d.comb += [
+            ir.dataBusIn.eq(dataBus),
+            ir.controls.eq(controls),
+        ]
+
+        m.d.comb += [
             self.A.eq(addrBus),
             self.Dout.eq(dataBus),
             self.hiz.eq(mcycler.hiz),
@@ -107,9 +114,10 @@ class Z80(Elaboratable):
             self.nBUSAK.eq(~mcycler.busack),
         ]
 
-        m.d.comb += addrBus.eq(registers.addrBusOut)
+        m.d.comb += addrBus.eq(registers.addrBusOut | ir.addrBusOut)
         m.d.comb += dataBus.eq(registers.dataBusOut | alu.dataBusOut
-                               | addrALU.dataBusOut | mcycler.dataBusOut)
+                               | addrALU.dataBusOut | mcycler.dataBusOut
+                               | ir.dataBusOut)
 
         if self.include_z80fi:
             z80registers = Record(

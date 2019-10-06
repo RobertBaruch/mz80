@@ -16,6 +16,7 @@ from nmigen.hdl.ast import Tick
 class Edgelord(Elaboratable):
     def __init__(self):
         self.clk_state = Signal()
+        self.unfunf = Signal()
 
     def elaborate(self, platform):
         pos = Signal()
@@ -40,6 +41,7 @@ class Edgelord(Elaboratable):
         #     if (reset) neg <= 0;
         #     else neg <= neg ^ clk_state;
         # end
+        m.d.neg += self.unfunf.eq(~self.unfunf)
         with m.If(rst):
             m.d.pos += pos.eq(0)
             m.d.neg += neg.eq(0)

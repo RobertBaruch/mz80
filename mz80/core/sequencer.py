@@ -424,9 +424,9 @@ class Sequencer(Elaboratable):
             with m.Elif(self.cycle_num == 1):
                 self.initiateOperandReadInto(m, Register8.TMP)
             with m.Elif(self.cycle_num == 2):
-                self.aluAddrAddLow(m, Register16.HL, Register8.W)
+                self.aluAddrAddLow(m, Register16.HL, Register8.Z)
             with m.Elif(self.cycle_num == 3):
-                self.aluAddrAddHigh(m, Register16.HL, Register8.Z)
+                self.aluAddrAddHigh(m, Register16.HL, Register8.W)
             with m.Elif(self.cycle_num == 4):
                 self.initiateMemWrite(m, Register16.WZ, Register8.TMP)
             with m.Else():

@@ -7,6 +7,14 @@ from .muxing import *
 
 class AddrALU(Elaboratable):
     """An 8-bit ALU that only adds and has a carry.
+
+    A 16-bit add is carried out by first loading the offset register.
+    Then, reading the result (reading ADDR_ALU) yields the low byte,
+    and saves the carry on the next positive clock. Then the offset
+    becomes FF or 00 depending on the sign of offset, and the high byte
+    is added.
+
+    When ADDR_ALU is no longer being read, carry is reset to 0.
     """
 
     def __init__(self):
@@ -17,7 +25,9 @@ class AddrALU(Elaboratable):
         self.dataBusOut = Signal(8)
 
         self.offset = Signal(8)
+        self.input2 = Signal(8)
         self.carry = Signal()
+        self.hibyte = Signal()
         self.result = Signal(9)
 
     def ports(self):
@@ -26,15 +36,34 @@ class AddrALU(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        m.d.comb += self.result.eq(self.offset + self.input + self.carry)
-        m.d.comb += self.dataBusOut.eq(self.result[0:8])
-
         with m.If(self.controls.writeRegister8 == Register8.OFFSET):
             m.d.pos += self.offset.eq(self.dataBus)
+
+        with m.If(self.controls.readRegister8 != Register8.ADDR_ALU):
             m.d.pos += self.carry.eq(0)
-        with m.Elif(self.controls.addrALUInputByte == 1):
-            m.d.pos += self.offset.eq(Mux(self.offset[7], 0xFF, 0x00))
+            m.d.pos += self.hibyte.eq(0)
+        with m.Else():
             m.d.pos += self.carry.eq(self.result[8])
+            m.d.pos += self.hibyte.eq(1)
+
+        with m.If(self.hibyte == 0):
+            m.d.comb += self.input2.eq(self.offset)
+        with m.Else():
+            m.d.comb += self.input2.eq(Mux(self.offset[7], 0xFF, 0x00))
+
+        m.d.comb += self.result.eq(self.input2 + self.input + self.carry)
+
+        with m.If(self.controls.readRegister8 == Register8.ADDR_ALU):
+            m.d.comb += self.dataBusOut.eq(self.result[0:8])
+        with m.Else():
+            m.d.comb += self.dataBusOut.eq(0)
+
+        # with m.If(self.controls.writeRegister8 == Register8.OFFSET):
+        #     m.d.pos += self.offset.eq(self.dataBus)
+        #     m.d.pos += self.carry.eq(0)
+        # with m.Elif(self.controls.addrALUInputByte == 1):
+        #     m.d.pos += self.offset.eq(Mux(self.offset[7], 0xFF, 0x00))
+        #     m.d.pos += self.carry.eq(self.result[8])
 
         if platform == "formal":
             self.formal(m)

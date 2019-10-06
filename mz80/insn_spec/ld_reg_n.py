@@ -16,8 +16,6 @@ class ld_reg_n(Elaboratable):
 
         r = self.actual.instr[3:6]
         n = self.actual.operands.data0
-        offset8 = self.actual.operands.data1
-        offset = Cat(offset8, Repl(offset8[7], 8))  # sign extend
 
         m.d.comb += self.spec.valid.eq(
             self.actual.valid & self.actual.instr.matches("00---110"))
@@ -55,6 +53,9 @@ class ld_reg_n(Elaboratable):
                 self.spec.memwrs.data0.eq(n),
             ]
         with m.Else():
+            offset8 = self.actual.operands.data0
+            offset = Cat(offset8, Repl(offset8[7], 8))  # sign extend
+            n = self.actual.operands.data1
             addr = Mux(self.actual.useIX, self.actual.regs_in.IX,
                        self.actual.regs_in.IY)
             addr += offset
@@ -86,8 +87,6 @@ class ld_reg_n(Elaboratable):
 
 
 if __name__ == "__main__":
-    m = Module()
-
     clk = Signal()
     rst = Signal()
 
@@ -99,6 +98,7 @@ if __name__ == "__main__":
     neg.clk = clk
     neg.rst = rst
 
+    m = Module()
     m.domains.pos = pos
     m.domains.neg = neg
     m.submodules.z80 = z80 = Z80(include_z80fi=True)

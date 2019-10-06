@@ -80,6 +80,19 @@ class MCycler(Elaboratable):
         self.tcycle = Signal(4)
         self.tcycles = Signal(4)
 
+        self.waitstated = Signal()
+        self.busrequested = Signal()
+        self.neg_latched_Din = Signal(8)
+        self.pos_latched_Din = Signal(8)
+
+        self.cycle_to_start = Signal.enum(MCycle)
+
+        self.latched_addr = Signal(16)
+        self.latched_refresh_addr = Signal(16)
+        self.latched_wdata = Signal(8)
+
+        self.edgelord = Edgelord()
+
     def ports(self):
         return [
             self.A, self.Din, self.Dout, self.ddir, self.busreq, self.buswait,
@@ -91,25 +104,16 @@ class MCycler(Elaboratable):
 
     def elaborate(self, platform):
         m = Module()
-        m.submodules.edgelord = edgelord = Edgelord()
+        m.submodules.edgelord = self.edgelord
 
-        self.waitstated = Signal()
         m.d.neg += self.waitstated.eq(self.buswait)
 
-        self.busrequested = Signal()
         m.d.pos += self.busrequested.eq(self.busreq)
 
-        self.neg_latched_Din = Signal(8)
+        m.d.pos += self.pos_latched_Din.eq(self.Din)
         m.d.neg += self.neg_latched_Din.eq(self.Din)
 
-        self.latched_rdata = Signal(8)
-
-        self.c = edgelord.clk_state
-        self.cycle_to_start = Signal.enum(MCycle)
-
-        self.latched_addr = Signal(16)
-        self.latched_refresh_addr = Signal(16)
-        self.latched_wdata = Signal(8)
+        self.c = self.edgelord.clk_state
         with m.If(self.mcycle_done):
             m.d.pos += [
                 self.latched_addr.eq(self.addr),
@@ -161,6 +165,7 @@ class MCycler(Elaboratable):
                     self.m1.eq(1),
                     self.rd.eq(~self.c),
                 ]
+                m.d.comb += self.rdata.eq(self.Din)
                 m.d.pos += self.tcycles.eq(1)
                 m.next = "M1_2"
 
@@ -173,13 +178,12 @@ class MCycler(Elaboratable):
                     self.m1.eq(1),
                     self.rd.eq(1),
                 ]
+                m.d.comb += self.rdata.eq(self.Din)
+
                 with m.If(self.waitstated):
                     m.next = "M1_2"
                 with m.Else():
-                    m.d.pos += [
-                        self.latched_rdata.eq(self.Din),
-                        self.tcycles.eq(2),
-                    ]
+                    m.d.pos += self.tcycles.eq(2)
                     m.next = "M1_3"
 
             with m.State("M1_3"):
@@ -188,8 +192,8 @@ class MCycler(Elaboratable):
                     self.tcycle.eq(3),
                     self.A.eq(Mux(self.LATCHING, self.latched_refresh_addr, self.refresh_addr)),
                     self.mreq.eq(~self.c),
-                    self.rdata.eq(self.latched_rdata),
                 ]
+                m.d.comb += self.rdata.eq(self.pos_latched_Din),
                 m.d.pos += self.tcycles.eq(3)
                 m.next = "M1_4"
 
@@ -199,8 +203,8 @@ class MCycler(Elaboratable):
                     self.tcycle.eq(4),
                     self.A.eq(Mux(self.LATCHING, self.latched_refresh_addr, self.refresh_addr)),
                     self.mreq.eq(self.c),
-                    self.rdata.eq(self.latched_rdata),
                 ]
+                m.d.comb += self.rdata.eq(self.pos_latched_Din),
                 self.endCycle(m, self.cycle)
 
             with m.State("M1_EXT"):
@@ -208,8 +212,8 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.M1),
                     self.tcycle.eq(5),
                     self.A.eq(Mux(self.LATCHING, self.latched_refresh_addr, self.refresh_addr)),
-                    self.rdata.eq(self.latched_rdata),
                 ]
+                m.d.comb += self.rdata.eq(self.pos_latched_Din),
                 self.endCycle(m, self.cycle)
 
             with m.State("MEMRD_1"):
@@ -219,8 +223,8 @@ class MCycler(Elaboratable):
                     self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
                     self.mreq.eq(~self.c),
                     self.rd.eq(~self.c),
-                    self.rdata.eq(self.latched_rdata),
                 ]
+                m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 m.d.pos += self.tcycles.eq(1)
                 m.next = "MEMRD_2"
 
@@ -231,8 +235,8 @@ class MCycler(Elaboratable):
                     self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
                     self.mreq.eq(1),
                     self.rd.eq(1),
-                    self.rdata.eq(self.latched_rdata),
                 ]
+                m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 m.d.pos += self.tcycles.eq(2)
                 with m.If(self.waitstated):
                     m.next = "MEMRD_2"
@@ -246,9 +250,8 @@ class MCycler(Elaboratable):
                     self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
                     self.mreq.eq(self.c),
                     self.rd.eq(self.c),
-                    self.rdata.eq(self.neg_latched_Din),
                 ]
-                m.d.pos += self.latched_rdata.eq(self.neg_latched_Din)
+                m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 self.endCycle(m, self.cycle)
 
             with m.State("MEMRD_EXT"):
@@ -256,8 +259,8 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.MEMRD),
                     self.tcycle.eq(4),
                     self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
-                    self.rdata.eq(self.latched_rdata),
                 ]
+                m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 self.endCycle(m, self.cycle)
 
             with m.State("MEMWR_1"):
@@ -330,8 +333,8 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.IORD),
                     self.tcycle.eq(1),
                     self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
-                    self.rdata.eq(self.latched_rdata),
                 ]
+                m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 m.d.pos += self.tcycles.eq(1)
                 m.next = "IORD_2"
 
@@ -342,8 +345,8 @@ class MCycler(Elaboratable):
                     self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
                     self.iorq.eq(1),
                     self.rd.eq(1),
-                    self.rdata.eq(self.latched_rdata),
                 ]
+                m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 m.d.pos += self.tcycles.eq(2)
                 m.next = "IORD_WAIT"
 
@@ -354,8 +357,8 @@ class MCycler(Elaboratable):
                     self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
                     self.iorq.eq(1),
                     self.rd.eq(1),
-                    self.rdata.eq(self.latched_rdata),
                 ]
+                m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 m.d.pos += self.tcycles.eq(3)
                 with m.If(self.waitstated):
                     m.next = "IORD_WAIT"
@@ -369,9 +372,8 @@ class MCycler(Elaboratable):
                     self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
                     self.iorq.eq(self.c),
                     self.rd.eq(self.c),
-                    self.rdata.eq(self.neg_latched_Din),
                 ]
-                m.d.pos += self.latched_rdata.eq(self.neg_latched_Din)
+                m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 self.endCycle(m, self.cycle)
 
             with m.State("IORD_EXT"):
@@ -379,8 +381,8 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.IORD),
                     self.tcycle.eq(4),
                     self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addr)),
-                    self.rdata.eq(self.latched_rdata),
                 ]
+                m.d.comb += self.rdata.eq(self.neg_latched_Din),
                 self.endCycle(m, self.cycle)
 
             with m.State("IOWR_1"):
@@ -456,7 +458,6 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.BUSRELEASE),
                     self.hiz.eq(1),
                     self.busack.eq(1),
-                    self.rdata.eq(self.latched_rdata),
                 ]
                 m.d.pos += self.tcycles.eq(0)
                 with m.If(~self.busrequested):
@@ -467,7 +468,6 @@ class MCycler(Elaboratable):
                     self.mcycle.eq(MCycle.BUSRELEASE),
                     self.hiz.eq(1),
                     self.busack.eq(self.c),
-                    self.rdata.eq(self.latched_rdata),
                 ]
                 self.endCycle(m, self.cycle)
 

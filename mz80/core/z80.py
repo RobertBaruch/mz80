@@ -65,7 +65,7 @@ class Z80(Elaboratable):
 
         m.d.comb += [
             registers.input16.eq(incdec.output),
-            registers.input8.eq(dataBus),
+            registers.dataBusIn.eq(dataBus),
             registers.controls.eq(controls),
         ]
 
@@ -75,8 +75,8 @@ class Z80(Elaboratable):
             mcycler.cycle.eq(sequencer.cycle),
             mcycler.extend.eq(sequencer.extend),
             mcycler.busreq.eq(~self.nBUSRQ),
-            mcycler.wdata.eq(dataBus),
             mcycler.Din.eq(self.Din),
+            mcycler.dataBusIn.eq(dataBus),
             mcycler.controls.eq(controls),
         ]
 
@@ -86,13 +86,13 @@ class Z80(Elaboratable):
         ]
 
         m.d.comb += [
-            alu.input.eq(dataBus),
+            alu.dataBusIn.eq(dataBus),
             alu.controls.eq(controls),
         ]
 
         m.d.comb += [
             addrALU.input.eq(registers.addrALUInput),
-            addrALU.dataBus.eq(dataBus),
+            addrALU.dataBusIn.eq(dataBus),
             addrALU.controls.eq(controls),
         ]
 

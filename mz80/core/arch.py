@@ -23,7 +23,7 @@ class Registers(Elaboratable):
 
         self.dataBusOut = Signal(8)
         self.output16 = Signal(16)
-        self.input8 = Signal(8)
+        self.dataBusIn = Signal(8)
         self.input16 = Signal(16)
 
         self.addrALUInput = Signal(8)
@@ -115,38 +115,38 @@ class Registers(Elaboratable):
             with m.Switch(self.controls.writeRegister8):
                 with m.Case(Register8.W):
                     m.d.pos += self.W[self.controls.registerSet].eq(
-                        self.input8)
+                        self.dataBusIn)
                 with m.Case(Register8.Z):
                     m.d.pos += self.Z[self.controls.registerSet].eq(
-                        self.input8)
+                        self.dataBusIn)
                 with m.Case(Register8.B):
                     m.d.pos += self.B[self.controls.registerSet].eq(
-                        self.input8)
+                        self.dataBusIn)
                 with m.Case(Register8.C):
                     m.d.pos += self.C[self.controls.registerSet].eq(
-                        self.input8)
+                        self.dataBusIn)
                 with m.Case(Register8.D):
                     m.d.pos += self.D[self.controls.registerSet].eq(
-                        self.input8)
+                        self.dataBusIn)
                 with m.Case(Register8.E):
                     m.d.pos += self.E[self.controls.registerSet].eq(
-                        self.input8)
+                        self.dataBusIn)
                 with m.Case(Register8.H):
                     with m.If(self.controls.useIX):
-                        m.d.pos += self.IXh.eq(self.input8)
+                        m.d.pos += self.IXh.eq(self.dataBusIn)
                     with m.Elif(self.controls.useIY):
-                        m.d.pos += self.IYh.eq(self.input8)
+                        m.d.pos += self.IYh.eq(self.dataBusIn)
                     with m.Else():
                         m.d.pos += self.H[self.controls.registerSet].eq(
-                            self.input8)
+                            self.dataBusIn)
                 with m.Case(Register8.L):
                     with m.If(self.controls.useIX):
-                        m.d.pos += self.IXl.eq(self.input8)
+                        m.d.pos += self.IXl.eq(self.dataBusIn)
                     with m.Elif(self.controls.useIY):
-                        m.d.pos += self.IYl.eq(self.input8)
+                        m.d.pos += self.IYl.eq(self.dataBusIn)
                     with m.Else():
                         m.d.pos += self.L[self.controls.registerSet].eq(
-                            self.input8)
+                            self.dataBusIn)
 
         with m.Switch(self.controls.readRegister16):
             with m.Case(Register16.WZ):

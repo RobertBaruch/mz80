@@ -21,7 +21,7 @@ class AddrALU(Elaboratable):
         self.controls = SequencerControls()
 
         self.input = Signal(8)
-        self.dataBus = Signal(8)
+        self.dataBusIn = Signal(8)
         self.dataBusOut = Signal(8)
 
         self.offset = Signal(8)
@@ -31,13 +31,13 @@ class AddrALU(Elaboratable):
         self.result = Signal(9)
 
     def ports(self):
-        return [self.input, self.dataBus, self.dataBusOut]
+        return [self.input, self.dataBusIn, self.dataBusOut]
 
     def elaborate(self, platform):
         m = Module()
 
         with m.If(self.controls.writeRegister8 == Register8.OFFSET):
-            m.d.pos += self.offset.eq(self.dataBus)
+            m.d.pos += self.offset.eq(self.dataBusIn)
 
         with m.If(self.controls.readRegister8 != Register8.ADDR_ALU):
             m.d.pos += self.carry.eq(0)
@@ -58,13 +58,6 @@ class AddrALU(Elaboratable):
         with m.Else():
             m.d.comb += self.dataBusOut.eq(0)
 
-        # with m.If(self.controls.writeRegister8 == Register8.OFFSET):
-        #     m.d.pos += self.offset.eq(self.dataBus)
-        #     m.d.pos += self.carry.eq(0)
-        # with m.Elif(self.controls.addrALUInputByte == 1):
-        #     m.d.pos += self.offset.eq(Mux(self.offset[7], 0xFF, 0x00))
-        #     m.d.pos += self.carry.eq(self.result[8])
-
         if platform == "formal":
             self.formal(m)
 
@@ -80,7 +73,7 @@ class AddrALU(Elaboratable):
         m.d.comb += continueAdd.eq(self.controls.addrALUInputByte == 1)
 
         loadedOffset = Signal(8)
-        m.d.comb += loadedOffset.eq(Past(self.dataBus, 2))
+        m.d.comb += loadedOffset.eq(Past(self.dataBusIn, 2))
 
         inputLow = Signal(8)
         inputHigh = Signal(8)
@@ -90,7 +83,7 @@ class AddrALU(Elaboratable):
 
         offsetLow = Signal(8)
         offsetHigh = Signal(8)
-        m.d.comb += offsetLow.eq(Past(self.dataBus, 2))
+        m.d.comb += offsetLow.eq(Past(self.dataBusIn, 2))
         m.d.comb += offsetHigh.eq(Mux(offsetLow[7], 0xFF, 0x00))
         offset16 = Cat(offsetLow, offsetHigh)
 

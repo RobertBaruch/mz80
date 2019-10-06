@@ -7,7 +7,7 @@ from ..z80fi.z80fi import *
 
 class ALU(Elaboratable):
     def __init__(self, include_z80fi=False):
-        self.input = Signal(8)
+        self.dataBusIn = Signal(8)
         self.dataBusOut = Signal(8)
         self.controls = SequencerControls()
 
@@ -29,11 +29,11 @@ class ALU(Elaboratable):
 
         with m.Switch(self.controls.writeRegister8):
             with m.Case(Register8.A):
-                m.d.pos += A[self.controls.registerSet].eq(self.input)
+                m.d.pos += A[self.controls.registerSet].eq(self.dataBusIn)
             with m.Case(Register8.F):
-                m.d.pos += F[self.controls.registerSet].eq(self.input)
+                m.d.pos += F[self.controls.registerSet].eq(self.dataBusIn)
             with m.Case(Register8.TMP):
-                m.d.pos += TMP.eq(self.input)
+                m.d.pos += TMP.eq(self.dataBusIn)
 
         with m.Switch(self.controls.readRegister8):
             with m.Case(Register8.A):

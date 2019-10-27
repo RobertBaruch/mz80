@@ -6,6 +6,7 @@ from nmigen.asserts import *
 from .edgelord import Edgelord
 from .muxing import *
 
+
 class MCycler(Elaboratable):
     def __init__(self):
         self.LATCHING = Const(0)
@@ -46,19 +47,27 @@ class MCycler(Elaboratable):
         # Once the bus is released, the signal is sampled on every rising edge
         # of the clock. If low, then the busack signal is deasserted on the
         # # next negative edge of the clock, and on the following rising edge,
-        # the next machine cycle is initiated and the address, data, and tristate
-        # control lines are taken out of the high impedance state.
+        # the next machine cycle is initiated and the address, data, and
+        # tristate control lines are taken out of the high impedance state.
         self.busreq = Signal()
 
-        # Adds a wait state to a memory or I/O read or write cycle. This includes
-        # a fetch cycle.
+        # Adds a wait state to a memory or I/O read or write cycle. This
+        # includes a fetch cycle.
         self.buswait = Signal()
+
+        # Requests an interrupt. Sampled on the rising edge of the last clock
+        # period of the last machine cycle of any instruction. Actually,
+        # sampled on the last clock period of every machine cycle, but doesn't
+        # take effect unless the machine cycle is the last in an instruction.
+        self.intreq = Signal()
 
         #
         # Signals coming from the sequencer
         #
 
         self.extend = Signal()
+        # Indicates that this is the last machine cycle in the instruction.
+        self.last_cycle = Signal()
         self.cycle = Signal.enum(MCycle)
         self.addrBusIn = Signal(16)
         self.dataBusIn = Signal(8)
@@ -81,6 +90,7 @@ class MCycler(Elaboratable):
 
         self.waitstated = Signal()
         self.busrequested = Signal()
+        self.intrequested = Signal()
         self.neg_latched_Din = Signal(8)
         self.pos_latched_Din = Signal(8)
 
@@ -95,6 +105,7 @@ class MCycler(Elaboratable):
     def ports(self):
         return [
             self.A, self.Din, self.Dout, self.ddir, self.busreq, self.buswait,
+            self.intreq,
             self.mreq, self.iorq, self.rd, self.wr, self.A, self.m1, self.rfsh,
             self.busack, self.hiz, self.extend, self.cycle, self.addrBusIn,
             self.dataBusIn, self.act, self.rdata, self.mcycle,
@@ -108,6 +119,7 @@ class MCycler(Elaboratable):
         m.d.neg += self.waitstated.eq(self.buswait)
 
         m.d.pos += self.busrequested.eq(self.busreq)
+        m.d.pos += self.intrequested.eq(self.intreq)
 
         m.d.pos += self.pos_latched_Din.eq(self.Din)
         m.d.neg += self.neg_latched_Din.eq(self.Din)
@@ -159,7 +171,8 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.M1),
                     self.tcycle.eq(1),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr,
+                                  self.addrBusIn)),
                     self.mreq.eq(~self.c),
                     self.m1.eq(1),
                     self.rd.eq(~self.c),
@@ -172,7 +185,8 @@ class MCycler(Elaboratable):
                 m.d.comb += [
                     self.mcycle.eq(MCycle.M1),
                     self.tcycle.eq(2),
-                    self.A.eq(Mux(self.LATCHING, self.latched_addr, self.addrBusIn)),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr,
+                                  self.addrBusIn)),
                     self.mreq.eq(1),
                     self.m1.eq(1),
                     self.rd.eq(1),
@@ -470,14 +484,94 @@ class MCycler(Elaboratable):
                 ]
                 self.endCycle(m, self.cycle)
 
+            with m.State("INTM1_1"):
+                m.d.comb += [
+                    self.mcycle.eq(MCycle.INTM1),
+                    self.tcycle.eq(1),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr,
+                                  self.addrBusIn)),
+                    self.mreq.eq(0),
+                    self.m1.eq(1),
+                ]
+                m.d.comb += self.rdata.eq(self.Din)
+                m.d.pos += self.tcycles.eq(1)
+                m.next = "INTM1_2"
+
+            with m.State("INTM1_2"):
+                m.d.comb += [
+                    self.mcycle.eq(MCycle.INTM1),
+                    self.tcycle.eq(2),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr,
+                                  self.addrBusIn)),
+                    self.mreq.eq(0),
+                    self.m1.eq(1),
+                ]
+                m.d.comb += self.rdata.eq(self.Din)
+                m.d.pos += self.tcycles.eq(2)
+                m.next = "INTM1_2W1"
+
+            with m.State("INTM1_2W1"):
+                m.d.comb += [
+                    self.mcycle.eq(MCycle.INTM1),
+                    self.tcycle.eq(3),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr,
+                                  self.addrBusIn)),
+                    self.mreq.eq(0),
+                    self.iorq.eq(~self.c),
+                    self.m1.eq(1),
+                ]
+                m.d.comb += self.rdata.eq(self.Din)
+                m.d.pos += self.tcycles.eq(3)
+                m.next = "INTM1_2W2"
+
+            with m.State("INTM1_2W2"):
+                m.d.comb += [
+                    self.mcycle.eq(MCycle.INTM1),
+                    self.tcycle.eq(4),
+                    self.A.eq(Mux(self.LATCHING, self.latched_addr,
+                                  self.addrBusIn)),
+                    self.mreq.eq(0),
+                    self.iorq.eq(1),
+                    self.m1.eq(1),
+                ]
+                m.d.comb += self.rdata.eq(self.Din)
+                with m.If(self.waitstated):
+                    m.next = "INTM1_2W2"
+                with m.Else():
+                    m.d.pos += self.tcycles.eq(4)
+                    m.next = "INTM1_3"
+
+            with m.State("INTM1_3"):
+                m.d.comb += [
+                    self.mcycle.eq(MCycle.INTM1),
+                    self.tcycle.eq(5),
+                    self.A.eq(Mux(self.LATCHING, self.latched_refresh_addr, self.addrBusIn)),
+                    self.mreq.eq(~self.c),
+                ]
+                m.d.comb += self.rdata.eq(self.pos_latched_Din),
+                m.d.pos += self.tcycles.eq(5)
+                m.next = "INTM1_4"
+
+            with m.State("INTM1_4"):
+                m.d.comb += [
+                    self.mcycle.eq(MCycle.INTM1),
+                    self.tcycle.eq(6),
+                    self.A.eq(Mux(self.LATCHING, self.latched_refresh_addr, self.addrBusIn)),
+                    self.mreq.eq(self.c),
+                ]
+                m.d.comb += self.rdata.eq(self.pos_latched_Din),
+                self.endCycle(m, self.cycle)
+
         if platform == "formal":
             self.formal(m)
         return m
 
     def endCycle(self, m, next):
         m.d.pos += self.tcycles.eq(self.tcycles + 1)
-        with m.If(self.extend & (self.mcycle !=
-                  MCycle.BUSRELEASE) & (self.mcycle != MCycle.NONE)):
+        with m.If(self.extend &
+                  (self.mcycle != MCycle.BUSRELEASE) &
+                  (self.mcycle != MCycle.INTM1) &
+                  (self.mcycle != MCycle.NONE)):
             with m.Switch(self.mcycle):
                 with m.Case(MCycle.M1):
                     m.next = "M1_EXT"
@@ -499,6 +593,12 @@ class MCycler(Elaboratable):
                 self.cycle_to_start.eq(MCycle.BUSRELEASE),
             ]
             m.next = "BUSRELEASE"
+        with m.Elif(self.intrequested & self.last_cycle):
+            m.d.comb += [
+                self.mcycle_done.eq(~self.c),
+                self.cycle_to_start.eq(MCycle.INTM1),
+            ]
+            m.next = "INTM1_1"
         with m.Else():
             m.d.comb += [
                 self.mcycle_done.eq(~self.c),

@@ -20,6 +20,8 @@ class Sequencer(Elaboratable):
         self.extended_cycle_controls = SequencerControls(name="extcyc_ctrls")
 
         self.instr = TransparentLatch(8)
+        # During M1, whether this is the beginning of the instruction.
+        self.start_insn = Signal()
 
         # Where the data from a memory read should be stored.
         self.memrd_addr = Signal.enum(Register16)
@@ -34,6 +36,7 @@ class Sequencer(Elaboratable):
         # Signals going to the mcycler
         #
         self.extend = Signal()
+        self.last_cycle = Signal()
         self.cycle = Signal.enum(MCycle)
 
         #
@@ -50,13 +53,10 @@ class Sequencer(Elaboratable):
 
     def ports(self):
         ps = [
-            self.extend, self.cycle, self.dataBusIn, self.act,
-            self.dataBusSource, self.dataBusDest, self.register8Source,
-            self.register16Source, self.register8Dest, self.register16Dest,
-            self.addrIncDecSetting
+            self.extend, self.last_cycle, self.cycle, self.dataBusIn, self.act,
         ]
-        if self.include_z80fi:
-            ps.extend(self.z80fi.ports())
+        # if self.include_z80fi:
+        #     ps.extend(self.z80fi.ports())
         return ps
 
     def elaborate(self, platform):
@@ -66,8 +66,8 @@ class Sequencer(Elaboratable):
         m.submodules.instr = self.instr
         m.d.comb += self.instr.input.eq(self.dataBusIn)
 
-        # When the MCycler is waitstated, there will be no act. In any other case,
-        # every state transition leads to an act.
+        # When the MCycler is waitstated, there will be no act. In any other
+        # case, every state transition leads to an act.
         with m.FSM(domain="pos", reset="RESET") as fsm:
             # defaults
             m.d.comb += self.controls.eq(0)
@@ -103,12 +103,14 @@ class Sequencer(Elaboratable):
                     Register8.MCYCLER_RDATA)
 
                 if self.include_z80fi:
-                    # Take a snapshot of the state. This is the state coming out
-                    # of the previous instruction. We want to keep the state going
-                    # in to the previous instruction, and we'll load up the state
-                    # going in to this instruction on the next cycle.
-                    m.d.comb += self.z80fi.control.set_valid.eq(1)
-                    m.d.comb += self.z80fi.control.save_registers_out.eq(1)
+                    with m.If(self.start_insn):
+                        # Take a snapshot of the state. This is the state coming
+                        # out of the previous instruction. We want to keep the
+                        # state going in to the previous instruction, and we'll
+                        # load up the state going in to this instruction on the
+                        # next cycle.
+                        m.d.comb += self.z80fi.control.set_valid.eq(1)
+                        m.d.comb += self.z80fi.control.save_registers_out.eq(1)
 
                 m.next = "M1_T2"
 
@@ -118,10 +120,6 @@ class Sequencer(Elaboratable):
                 m.d.comb += self.controls.readRegister8.eq(
                     Register8.MCYCLER_RDATA)
 
-                if self.include_z80fi:
-                    m.d.comb += self.z80fi.control.clear.eq(1)
-                    m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.M1)
-
                 with m.If(self.act):
                     m.d.comb += self.controls.addrIncDecSetting.eq(
                         IncDecSetting.INC)
@@ -130,9 +128,14 @@ class Sequencer(Elaboratable):
 
                     # Take a snapshot of the state. This is the state going
                     # in to this instruction. Also the instruction register.
+                    # We do this even if the instruction was prefixed, because
+                    # we don't count the prefix in the collected data --
+                    # otherwise we'd have to allow infinite prefixes!
                     if self.include_z80fi:
                         m.d.comb += [
                             self.z80fi.control.save_registers_in.eq(1),
+                            self.z80fi.control.clear.eq(1),
+                            self.z80fi.control.add_mcycle.eq(MCycle.M1),
                             self.z80fi.control.save_instruction.eq(1),
                             self.z80fi.control.instr.eq(self.instr.input),
                             self.z80fi.control.useIX.eq(self.controls.useIX),
@@ -150,6 +153,7 @@ class Sequencer(Elaboratable):
             with m.State("M1_T4"):
                 m.d.comb += self.controls.readRegister16.eq(Register16.R)
                 m.d.comb += self.controls.incR.eq(1)
+                m.d.pos += self.start_insn.eq(0)
                 if self.include_z80fi:
                     m.d.comb += self.z80fi.control.add_tcycle.eq(1)
                 self.execute(m)
@@ -252,6 +256,25 @@ class Sequencer(Elaboratable):
                     m.d.comb += self.z80fi.control.addr.eq(self.z80fi.bus.addr)
                     m.d.comb += self.z80fi.control.add_tcycle.eq(1)
 
+            with m.State("INTERNAL_T1"):
+                if self.include_z80fi:
+                    m.d.comb += self.z80fi.control.add_mcycle.eq(MCycle.INTERNAL)
+                m.next = "INTERNAL_T2"
+                m.d.comb += self.cycle.eq(MCycle.INTERNAL)
+                self.execute(m)
+
+            with m.State("INTERNAL_T2"):
+                if self.include_z80fi:
+                    m.d.comb += self.z80fi.control.add_tcycle.eq(1)
+                m.next = "INTERNAL_T3"
+                m.d.comb += self.cycle.eq(MCycle.INTERNAL)
+                self.execute(m)
+
+            with m.State("INTERNAL_T3"):
+                if self.include_z80fi:
+                    m.d.comb += self.z80fi.control.add_tcycle.eq(1)
+                self.execute(m)
+
             with m.State("HALT"):
                 m.next = "HALT"
 
@@ -263,8 +286,10 @@ class Sequencer(Elaboratable):
         This resets any setting from prefixes and resets the cycle number.
         """
         self.initiateOpcodeFetch(m)
+        m.d.comb += self.last_cycle.eq(1)
         m.d.pos += self.useIX.eq(0)
         m.d.pos += self.useIY.eq(0)
+        m.d.pos += self.start_insn.eq(1)
         m.d.pos += self.instr.en.eq(1)
         m.d.pos += self.cycle_num.eq(0)
 
@@ -308,12 +333,7 @@ class Sequencer(Elaboratable):
         m.d.pos += self.memrd_dest.eq(reg)
 
     def initiateMemRead(self, m, reg_addr, reg_data):
-        """Initiates a memory read using a 16-bit register as address.
-
-        * Registers (reg) -> addr bus (MCycler always gets this)
-        * Disable INSTR.
-        * Instruction decides where data bus goes once read is done.
-        """
+        """Initiates a memory read using a 16-bit register as address."""
         m.next = "RDMEM_T1"
         m.d.comb += self.cycle.eq(MCycle.MEMRD)
         m.d.pos += self.memrd_addr.eq(reg_addr)
@@ -323,9 +343,20 @@ class Sequencer(Elaboratable):
     def initiateMemWrite(self, m, reg_addr, reg_data):
         m.next = "WRMEM_T1"
         m.d.comb += self.cycle.eq(MCycle.MEMWR)
-        m.d.pos += self.instr.en.eq(0)
         m.d.pos += self.memwr_addr.eq(reg_addr)
         m.d.pos += self.memwr_src.eq(reg_data)
+        m.d.pos += self.instr.en.eq(0)
+
+    def initiateInternalOperation(self, m):
+        m.next = "INTERNAL_T1"
+        m.d.comb += self.cycle.eq(MCycle.INTERNAL)
+        m.d.pos += self.instr.en.eq(0)
+
+    def setDataBusSource(self, m, reg):
+        m.d.comb += self.controls.readRegister8.eq(reg)
+
+    def writeRegister8(self, m, reg):
+        m.d.comb += self.controls.writeRegister8.eq(reg)
 
     def aluAddrAddLow(self, m, reg16operand, reg_dest):
         self.extendCycle(m)
@@ -379,29 +410,100 @@ class Sequencer(Elaboratable):
     def NOP(self, m):
         self.initiateInstructionFetch(m)
 
+    def LD_REG_REG_gen(self, m):
+        dst_r = self.instr.output[3:6]
+        src_r = self.instr.output[0:3]
+        dst_hl = (dst_r == 6)
+        src_hl = (src_r == 6)
+        indexed = self.controls.useIX | self.controls.useIY
+        reg_to_reg = ~dst_hl & ~src_hl
+        halt = dst_hl & src_hl
+        rd_indirect = src_hl & ~dst_hl & ~indexed
+        wr_indirect = ~src_hl & dst_hl & ~indexed
+        rd_indexed = src_hl & ~dst_hl & indexed
+        wr_indexed = ~src_hl & dst_hl & indexed
+
+        conditions = [reg_to_reg, halt, rd_indirect, wr_indirect, rd_indexed, wr_indexed]
+        programs = [
+            [(Step.COPY_REG8, Arg.REG8_R, Arg.REG8_R, MCycle.M1, 0)],
+            [(Step.HALT, Arg.NONE, Arg.NONE, MCycle.HALT, 0)],
+            [(Step.MEM_RD, Arg.HL, Arg.REG8_R, MCycle.MEMRD, 0)],
+            [(Step.MEM_WR, Arg.HL, Arg.REG8_R, MCycle.MEMWR, 0)],
+            [(Step.MEM_RD, Arg.PC, Arg.OFFSET, MCycle.MEMRD, 1),
+             (Step.NOP, Arg.NONE, Arg.NONE, MCycle.INTERNAL, 2),
+             (Step.NOP, Arg.NONE, Arg.NONE, MCycle.EXTEND, 3),
+             (Step.NOP, Arg.NONE, Arg.NONE, MCycle.EXTEND, 4),
+             (Step.ADDR_ALU_ADD_LO, Arg.HL, Arg.Z, MCycle.EXTEND, 5),
+             (Step.ADDR_ALU_ADD_HI, Arg.HL, Arg.W, MCycle.EXTEND, 6),
+             (Step.MEM_RD, Arg.WZ, Arg.REG8_R, MCycle.MEMRD, 0)],
+            [(Step.MEM_RD, Arg.PC, Arg.OFFSET, MCycle.MEMRD, 1),
+             (Step.NOP, Arg.NONE, Arg.NONE, MCycle.INTERNAL, 2),
+             (Step.NOP, Arg.NONE, Arg.NONE, MCycle.EXTEND, 3),
+             (Step.NOP, Arg.NONE, Arg.NONE, MCycle.EXTEND, 4),
+             (Step.ADDR_ALU_ADD_LO, Arg.HL, Arg.Z, MCycle.EXTEND, 5),
+             (Step.ADDR_ALU_ADD_HI, Arg.HL, Arg.W, MCycle.EXTEND, 6),
+             (Step.MEM_WR, Arg.WZ, Arg.REG8_R, MCycle.MEMWR, 0)],
+        ]
+
     def LD_REG_REG(self, m):
         dst_r = self.instr.output[3:6]
         src_r = self.instr.output[0:3]
         dst_hl = (dst_r == 6)
         src_hl = (src_r == 6)
+        indexed = self.controls.useIX | self.controls.useIY
 
-        with m.If(self.cycle_num == 0):
-            with m.If(dst_hl & src_hl):
-                m.next = "HALT"
-            with m.Elif(~dst_hl & ~src_hl):
-                m.d.comb += self.controls.readRegister8.eq(Register8.r(src_r))
-                m.d.comb += self.controls.writeRegister8.eq(Register8.r(dst_r))
-                self.initiateInstructionFetch(m)
-            with m.Elif(src_hl):
-                self.initiateMemRead(m, Register16.HL, Register8.r(dst_r))
-            with m.Else():
-                self.initiateMemWrite(m, Register16.HL, Register8.r(src_r))
-        with m.If(self.cycle_num == 1):
-            with m.If(src_hl):
-                m.d.comb += self.controls.writeRegister8.eq(Register8.r(dst_r))
-            with m.Else():
-                m.d.comb += self.controls.readRegister8.eq(Register8.r(src_r))
+        with m.If(~dst_hl & ~src_hl):
+            self.setDataBusSource(m, Register8.r(src_r))
+            self.writeRegister8(m, Register8.r(dst_r))
             self.initiateInstructionFetch(m)
+        with m.Elif(dst_hl & src_hl):
+            m.next = "HALT"
+        with m.Elif(~indexed):
+            with m.If(src_hl):
+                with m.If(self.cycle_num == 0):
+                    self.initiateMemRead(m, Register16.HL, Register8.r(dst_r))
+                with m.Else():
+                    self.initiateInstructionFetch(m)
+            with m.Else():
+                with m.If(self.cycle_num == 0):
+                    self.initiateMemWrite(m, Register16.HL, Register8.r(src_r))
+                with m.Else():
+                    self.initiateInstructionFetch(m)
+        with m.Else():
+            with m.If(src_hl):
+                with m.If(self.cycle_num == 0):
+                    self.initiateOperandReadInto(m, Register8.OFFSET)
+                with m.Elif(self.cycle_num == 1):
+                    self.initiateInternalOperation(m)
+                with m.Elif(self.cycle_num == 2):
+                    pass
+                with m.Elif(self.cycle_num == 3):
+                    pass
+                with m.Elif(self.cycle_num == 4):
+                    self.aluAddrAddLow(m, Register16.HL, Register8.Z)
+                with m.Elif(self.cycle_num == 5):
+                    self.aluAddrAddHigh(m, Register16.HL, Register8.W)
+                with m.Elif(self.cycle_num == 6):
+                    self.initiateMemRead(m, Register16.WZ, Register8.r(dst_r))
+                with m.Else():
+                    self.initiateInstructionFetch(m)
+            with m.Else():
+                with m.If(self.cycle_num == 0):
+                    self.initiateOperandReadInto(m, Register8.OFFSET)
+                with m.Elif(self.cycle_num == 1):
+                    self.initiateInternalOperation(m)
+                with m.Elif(self.cycle_num == 2):
+                    pass
+                with m.Elif(self.cycle_num == 3):
+                    pass
+                with m.Elif(self.cycle_num == 4):
+                    self.aluAddrAddLow(m, Register16.HL, Register8.Z)
+                with m.Elif(self.cycle_num == 5):
+                    self.aluAddrAddHigh(m, Register16.HL, Register8.W)
+                with m.Elif(self.cycle_num == 6):
+                    self.initiateMemWrite(m, Register16.WZ, Register8.r(src_r))
+                with m.Else():
+                    self.initiateInstructionFetch(m)
 
     def LD_REG_N(self, m):
         r = self.instr.output[3:6]

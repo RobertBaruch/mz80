@@ -44,6 +44,7 @@ class MCycle(Enum):
     IOWR = 5
     INTERNAL = 6
     BUSRELEASE = 7
+    INTM1 = 8
 
 
 @unique

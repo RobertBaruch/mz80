@@ -1,9 +1,8 @@
 from nmigen import *
 from nmigen.cli import main
 from nmigen.asserts import *
-from nmigen.back import pysim
-from nmigen.hdl.ast import Tick
-
+import sys
+import itertools
 
 # module edgelord outputs the state of the clock without using
 # the clock in combinatorial logic. This is a good thing in
@@ -16,7 +15,8 @@ from nmigen.hdl.ast import Tick
 class Edgelord(Elaboratable):
     def __init__(self):
         self.clk_state = Signal()
-        self.unfunf = Signal()
+        self.unf_in = Signal()
+        self.unf_out = Signal()
 
     def elaborate(self, platform):
         pos = Signal()
@@ -24,6 +24,8 @@ class Edgelord(Elaboratable):
         rst = ResetSignal("pos")
 
         m = Module()
+
+        m.d.comb += self.unf_out.eq(~self.unf_in)
 
         # Verilog equivalent:
         #
@@ -41,7 +43,6 @@ class Edgelord(Elaboratable):
         #     if (reset) neg <= 0;
         #     else neg <= neg ^ clk_state;
         # end
-        m.d.neg += self.unfunf.eq(~self.unfunf)
         with m.If(rst):
             m.d.pos += pos.eq(0)
             m.d.neg += neg.eq(0)
@@ -68,7 +69,7 @@ class Edgelord(Elaboratable):
 
 if __name__ == "__main__":
     clk = Signal()
-    rst = Signal()
+    rst = Signal(reset = 1, reset_less = True)
 
     pos = ClockDomain()
     pos.clk = clk
@@ -83,25 +84,65 @@ if __name__ == "__main__":
     m = Module()
     m.domains.pos = pos
     m.domains.neg = neg
+
+    # This is required because of a bug (https://github.com/m-labs/nmigen/issues/28)
+    # phase = Signal()
+    # m.d.sync += phase.eq(~phase)
+    # edgelord = EnableInserter({"pos":~phase,"neg":phase})(edgelord)
+    # edgelord = DomainRenamer({"pos":"sync","neg":"sync"})(edgelord)
+
     m.submodules.edgelord = edgelord
 
-    # with pysim.Simulator(
-    #         m,
-    #         vcd_file=open("edgelord.vcd", "w"),
-    #         gtkw_file=open("edgelord.gtkw", "w"),
-    #         traces=[clk, rst, edgelord.clk_state]) as sim:
+    # with pysim.Simulator(m,
+    #                      vcd_file=open("edgelord.vcd", "w"),
+    #                      gtkw_file=open("edgelord.gtkw", "w"),
+    #                      traces=[clk, rst, edgelord.clk_state]) as sim:
     #     sim.add_clock(1e-9, domain="pos")
     #     sim.add_clock(1e-9, domain="neg")
 
-    #     #sim.add_clock(1e-9)
+    #     # sim.add_clock(1e-9)
+
 
     #     def process():
-    #         for i in range(0, 30):
-    #             yield Tick(domain="pos")
-    #             yield Tick(domain="neg")
+    #         yield rst.eq(1)
+    #         yield Delay(5e-9)
+    #         yield rst.eq(0)
 
-    #     #sim.add_sync_process(process(), domain="pos")
     #     sim.add_process(process())
-    #     sim.run()
+    #     sim.run_until(20e-9, run_passive=True)
 
-    main(m, ports=[clk, rst, edgelord.clk_state], platform="formal")
+    cycle = Signal(8, reset_less=True)
+    m.d.pos += cycle.eq(cycle + 1)
+
+    unf_in = Signal(reset=1, reset_less = True)
+    m.d.comb += edgelord.unf_in.eq(unf_in)
+
+    def delay(d):
+        for _ in range(d):
+            yield None
+
+    def generate_signals(gen):
+        with m.Switch(cycle+1):
+            c = 0
+            ss = []
+            for s in gen():
+                if s is not None:
+                    ss.append([s])
+                    continue
+                c += 1
+                ss = list(itertools.chain(*ss)) # Flatten list
+                if len(ss) > 0:
+                    with m.Case(c):
+                        m.d.pos += ss
+                ss = []
+
+    def signal_generator():
+        yield from delay(3)
+        yield rst.eq(0)
+        yield [unf_in.eq(0)]
+        yield from delay(1)
+
+    generate_signals(signal_generator)
+
+    m.d.comb += Cover(cycle == 10)
+    main(m, ports=[clk, rst, edgelord.clk_state, edgelord.unf_in, edgelord.unf_out])

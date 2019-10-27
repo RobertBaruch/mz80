@@ -1,52 +1,42 @@
 [*]
 [*] GTKWave Analyzer v3.3.100 (w)1999-2019 BSI
-[*] Sun Oct 06 00:29:12 2019
+[*] Wed Oct 23 17:37:22 2019
 [*]
-[dumpfile] "F:\mz80\test_cover\engine_0\trace0.vcd"
-[dumpfile_mtime] "Sun Oct 06 00:20:53 2019"
-[dumpfile_size] 2288729
-[savefile] "F:\mz80\test.gtkw"
-[timestart] 78
-[size] 1616 600
-[pos] 43 39
-*-6.000000 100 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[dumpfile] "C:\Users\rober\Documents\mz80\cover_cover\engine_0\trace1.vcd"
+[dumpfile_mtime] "Wed Oct 23 17:31:11 2019"
+[dumpfile_size] 663081
+[savefile] "C:\Users\rober\Documents\mz80\test.gtkw"
+[timestart] 0
+[size] 1239 600
+[pos] -1 -1
+*-5.168257 90 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.state.
 [treeopen] top.z80.
-[treeopen] top.z80.mcycler.
-[treeopen] top.z80.sequencer.
-[sst_width] 335
-[signals_width] 254
+[sst_width] 197
+[signals_width] 238
 [sst_expanded] 1
-[sst_vpaned_height] 154
+[sst_vpaned_height] 153
 @28
-top.z80.clk
-top.z80.mcycler.mcycle[2:0]
+top.clk
 @22
+top.z80.mcycler.mcycle[3:0]
 top.z80.sequencer.cycle_num[3:0]
-top.z80.sequencer.ctrls__readRegister8[4:0]
-top.z80.sequencer.ctrls__writeRegister8[4:0]
-top.z80.dataBus[7:0]
-@28
-top.z80.mcycler.rd
-top.rst
-@22
-top.z80.Din[7:0]
-top.z80.mcycler.Din[7:0]
-top.test.spec__memwrs__addr0[15:0]
-top.test.spec__memwrs__data0[7:0]
-top.state.mem_wrs.memwrs__addr0[15:0]
-top.state.mem_wrs.memwrs__data0[7:0]
-top.z80.addrALU.input[7:0]
 top.z80.addrALU.offset[7:0]
+top.z80.registers.W1[7:0]
+top.z80.registers.Z1[7:0]
+top.z80.registers.IXh[7:0]
+top.z80.registers.IXl[7:0]
+top.z80.registers.PCh[7:0]
+top.z80.registers.PCl[7:0]
+top.test.actual__regs_out__PC[15:0]
+top.test.spec__regs_out__PC[15:0]
+top.state.regs_in.regs_in__PC[15:0]
 @28
-top.z80.addrALU.addrALUInputByte
+top.state.mcycles.mcycles__num[2:0]
 @22
-top.state.operands.operands__data0[7:0]
-top.state.operands.operands__data1[7:0]
-top.z80.mcycler.dataBusOut[7:0]
-top.z80.mcycler.latched_rdata[7:0]
-@23
-top.z80.mcycler.neg_latched_Din[7:0]
+top.test.actual__instr[7:0]
+@29
+top.test.actual__valid
 [pattern_trace] 1
 [pattern_trace] 0

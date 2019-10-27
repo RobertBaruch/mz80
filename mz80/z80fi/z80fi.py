@@ -336,12 +336,14 @@ class Z80fiCycles(Elaboratable):
                     m.d.pos += mcycles.tcycles6.eq(mcycles.tcycles6 + 1)
 
         with m.If(control.add_mcycle != MCycle.NONE):
+            # Because instruction state can only be finalized during
+            # M1 T1 of the next instruction, we register M1 cycles
+            # on M1 T2.
+            initial_cycles = Mux(control.add_mcycle == MCycle.M1, 2, 1)
+
             with m.If(control.clear):
-                # Because instruction state can only be finalized during
-                # M1 T1 of the next instruction, we register M1 cycles
-                # on M1 T2.
                 m.d.pos += mcycles.type1.eq(control.add_mcycle)
-                m.d.pos += mcycles.tcycles1.eq(2)
+                m.d.pos += mcycles.tcycles1.eq(initial_cycles)
                 m.d.pos += mcycles.num.eq(1)
 
             with m.Elif(mcycles.num < 6):
@@ -351,22 +353,22 @@ class Z80fiCycles(Elaboratable):
                         # M1 T1 of the next instruction, we register M1 cycles
                         # on M1 T2.
                         m.d.pos += mcycles.type1.eq(control.add_mcycle)
-                        m.d.pos += mcycles.tcycles1.eq(2)
+                        m.d.pos += mcycles.tcycles1.eq(initial_cycles)
                     with m.Case(1):
                         m.d.pos += mcycles.type2.eq(control.add_mcycle)
-                        m.d.pos += mcycles.tcycles2.eq(1)
+                        m.d.pos += mcycles.tcycles2.eq(initial_cycles)
                     with m.Case(2):
                         m.d.pos += mcycles.type3.eq(control.add_mcycle)
-                        m.d.pos += mcycles.tcycles3.eq(1)
+                        m.d.pos += mcycles.tcycles3.eq(initial_cycles)
                     with m.Case(3):
                         m.d.pos += mcycles.type4.eq(control.add_mcycle)
-                        m.d.pos += mcycles.tcycles4.eq(1)
+                        m.d.pos += mcycles.tcycles4.eq(initial_cycles)
                     with m.Case(4):
                         m.d.pos += mcycles.type5.eq(control.add_mcycle)
-                        m.d.pos += mcycles.tcycles5.eq(1)
+                        m.d.pos += mcycles.tcycles5.eq(initial_cycles)
                     with m.Case(5):
                         m.d.pos += mcycles.type6.eq(control.add_mcycle)
-                        m.d.pos += mcycles.tcycles6.eq(1)
+                        m.d.pos += mcycles.tcycles6.eq(initial_cycles)
 
                 m.d.pos += mcycles.num.eq(mcycles.num + 1)
 
